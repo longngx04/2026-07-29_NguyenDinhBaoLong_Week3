@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: broken-auth
 title: Broken Authentication
 tags: [example, authentication, session, a07, credential]
 ---

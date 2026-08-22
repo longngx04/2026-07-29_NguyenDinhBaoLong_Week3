@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: xxe
 title: XML External Entity XXE
 tags: [example, xxe, xml, cwe-611]
 ---

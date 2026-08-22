@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: vulnerable-components
 title: Vulnerable and Outdated Components
 tags: [example, components, cve, a06, dependencies]
 ---

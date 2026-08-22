@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: security-misconfiguration
 title: Security Misconfiguration
 tags: [example, misconfiguration, a05, defaults]
 ---

@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: path-traversal
 title: Path Traversal
 tags: [example, path-traversal, lfi, cwe-22]
 ---

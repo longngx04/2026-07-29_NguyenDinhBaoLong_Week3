@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: csrf
 title: Cross-Site Request Forgery CSRF
 tags: [example, csrf, session, cwe-352]
 ---

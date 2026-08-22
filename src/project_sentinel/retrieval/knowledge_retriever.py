@@ -32,7 +32,9 @@ def retrieve_knowledge(
     rule_id: str = "",
     cwe: Optional[List[str]] = None,
     owasp: Optional[List[str]] = None,
-    knowledge_dir: Path = Path("data/knowledge-base"),
+    # Keyword search CHỈ được quét tier1/. Nếu để nó quét cả tier2/ thì khớp chữ
+    # sẽ cạnh tranh với tra cứu tất định, đúng cái ưu thế vừa xây ở Task 4.
+    knowledge_dir: Path = Path("data/knowledge-base/tier1"),
     top_k: int = 3,
     max_snippet_chars: int = 700
 ) -> List[RetrievalHit]:

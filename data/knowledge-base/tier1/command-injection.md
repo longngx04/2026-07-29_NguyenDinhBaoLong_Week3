@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: command-injection
 title: OS Command Injection via Runtime.exec
 tags: [example, command-injection, cmdi, cwe-78, injection, java]
 ---

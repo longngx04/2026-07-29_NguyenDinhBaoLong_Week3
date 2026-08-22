@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: ssrf
 title: Server-Side Request Forgery SSRF
 tags: [example, ssrf, owasp-a10, request-forgery]
 ---

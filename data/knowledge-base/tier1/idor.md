@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: idor
 title: Insecure Direct Object Reference IDOR
 tags: [example, idor, access-control, broken-access-control, a01]
 ---

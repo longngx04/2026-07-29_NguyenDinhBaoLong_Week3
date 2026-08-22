@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: html-tampering
 title: HTML Tampering client-side trust
 tags: [example, html-tampering, client-side, validation]
 ---

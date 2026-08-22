@@ -1,4 +1,6 @@
 ---
+tier: 1
+id: insecure-deserialization
 title: Insecure Deserialization
 tags: [example, deserialization, cwe-502, a08, java]
 ---
