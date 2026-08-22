@@ -30,8 +30,10 @@ Phạm vi hiện tại là một môi trường thử nghiệm chạy bằng Doc
 OWASP WebGoat làm ứng dụng đích cố định. Hệ thống chạy một công cụ SAST
 (OpenGrep), một công cụ DAST (OWASP ZAP Baseline) quét qua một lane Gateway nội
 bộ riêng, một AI Agent phân tích cả hai nguồn finding, và một API Gateway kiểm
-soát mọi request kiểm thử. Kho tri thức gồm 20 tài liệu về OWASP Top 10 và các
-lỗ hổng web phổ biến, tìm kiếm bằng từ khoá.
+soát mọi request kiểm thử. Kho tri thức chia hai tầng: 14 tài liệu ở mức loại lỗ hổng, và 11 tài liệu ở mức
+họ sink cụ thể (`Statement.executeQuery`, `Runtime.exec`, …). Tầng sink được tra
+bằng khoá tất định từ `rule_id` của scanner, không phải bằng khớp từ khoá — và
+agent **bắt buộc** phải trích dẫn tài liệu tra được, nếu không record bị loại.
 
 ## Hạn chế
 

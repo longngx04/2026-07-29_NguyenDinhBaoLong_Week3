@@ -85,7 +85,7 @@ project-sentinel/
 ├── tests/                        # Unit, integration tests, and fixtures
 ├── eval/                         # Bộ 12 ca đánh giá + ground truth 23 finding WebGoat + bộ chấm
 ├── docs/                         # Kiến trúc, mô tả sản phẩm, giới hạn, kịch bản demo
-├── data/knowledge-base/          # OWASP & vulnerability knowledge base
+├── data/knowledge-base/          # KB hai tầng: tier1/ loại lỗ hổng, tier2/ họ sink
 ├── configs/                      # Prompts, OpenGrep rules, gateway allowlist
 ├── schemas/                      # JSON Schema definitions
 ├── artifacts/runs/<run-id>/      # Output runtime của từng lần chạy (Git ignore)
@@ -199,6 +199,7 @@ make eval REPEAT=3                 # chạy ba lần, báo phân bố thay vì m
 
 # Chấm trên 23 cảnh báo WebGoat THẬT, đối chiếu nhãn người review
 make score-ground-truth ANALYSIS=artifacts/runs/<run-id>/analysis.jsonl
+make kb-coverage                   # KB Tier 2 phủ tới đâu so với lỗ hổng có thật
 ```
 
 Ba bộ đo ba thứ khác nhau:
@@ -303,6 +304,11 @@ uv export --locked --extra dev --no-hashes --output-file requirements.txt
 ---
 
 ## Tài liệu
+
+Kho tri thức có hai tầng. `tier1/` trả lời *loại lỗ hổng này là gì*; `tier2/` trả lời
+*API cụ thể này nguy hiểm khi nào và **không** nguy hiểm khi nào*. Tầng hai được tra
+bằng khoá tất định (`rule_id`, rồi `cwe`), và khi tra được thì agent buộc phải trích
+dẫn — đây là ràng buộc Python kiểm, không phải lời khuyên trong prompt.
 
 | Tài liệu | Dành cho ai |
 | :--- | :--- |

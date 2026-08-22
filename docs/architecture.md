@@ -158,6 +158,19 @@ Agent có thể bịa. Ba lớp bên dưới đều **không hỏi ý Agent**.
 | **Provenance** | Finding ID, vị trí file/URL, CWE/OWASP, đường dẫn tri thức và bằng chứng đều phải **có thật trong input** | `analysis/validators.py` |
 | **Hiệu chỉnh** | Kết luận không được vượt quá bằng chứng; `reachability` đo bằng quan sát động | `analysis/calibration.py` |
 
+Lớp **Provenance** (`analysis/validators.py`) kiểm soát 11 luật bắt buộc:
+1. `source_finding_ids` phải trùng khớp `input_group_finding_ids` cả hai chiều (không thêm, không bớt).
+2. `locations` phải trùng khớp `input_locations` cả hai chiều (`{file, line}` hoặc `{url}`).
+3. `knowledge_refs` path phải có trong danh sách tài liệu tri thức của packet (`input_knowledge_paths`).
+4. `cwe` phải là tập con của `input_cwes`.
+5. `owasp` phải là tập con của `input_owasps`.
+6. `evidence` source path phải có trong `input_source_evidence`.
+7. `group_key` phải khớp chính xác `input_group_key`.
+8. `evidence` source content/start_line/end_line phải khớp nguyên văn input (đã chuẩn hoá thẻ).
+9. `knowledge_refs` score phải khớp điểm số do hệ thống tính.
+10. Trích dẫn Tier 2 bắt buộc: khi packet có tài liệu Tier 2 khớp theo `rule_id` (`match_kind="rule_id"`), record bắt buộc phải trích dẫn tài liệu đó trong `knowledge_refs` (không áp buộc với `match_kind="cwe"`).
+11. Đối chiếu tên loại lỗ hổng: `title` của record phải khớp chính xác `canonical_category` của tài liệu Tier 2 đã trích dẫn.
+
 Lớp thứ ba là lớp mới nhất và trả lời một lỗ hổng cụ thể: hai lớp đầu chỉ kiểm **cấu
 trúc**. Một record có thể có mọi ID đúng, mọi vị trí đúng, mọi CWE đúng — và vẫn kết luận
 `SQL Injection / high` cho một truy vấn hằng, trong khi chính phần giải thích của nó viết

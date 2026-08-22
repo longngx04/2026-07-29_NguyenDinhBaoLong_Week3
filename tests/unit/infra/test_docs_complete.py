@@ -77,3 +77,23 @@ def test_documentation_does_not_drift_on_eval_case_counts():
         assert "sáu ca" not in content, f"{doc.name} vẫn chứa 'sáu ca'"
         assert "6 ca" not in content, f"{doc.name} vẫn chứa '6 ca'"
 
+
+def test_tai_lieu_khong_noi_sai_so_doc_trong_kho_tri_thuc():
+    """Đọc đếm lại, không được chép con số cũ. Cùng khuôn với test số ca eval."""
+    kb = REPO_ROOT / "data" / "knowledge-base"
+    tier1 = len(list((kb / "tier1").glob("*.md")))
+    tier2 = len(list((kb / "tier2").glob("*.md")))
+    assert tier1 == 14
+    assert tier2 == 11
+
+    for name in ("README.md", "docs/product-brief.md"):
+        text = (REPO_ROOT / name).read_text(encoding="utf-8")
+        assert "20 tài liệu" not in text, f"{name} van noi '20 tai lieu'"
+
+
+def test_readme_noi_ve_hai_tang_va_lenh_do_phu():
+    text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert "tier1" in text and "tier2" in text
+    assert "make kb-coverage" in text
+
+
