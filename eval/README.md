@@ -42,6 +42,7 @@ ca kiểu "model có nói `high` không" vốn dao động giữa các lần ch�
 | 10 | Finding trỏ tới file không tồn tại | Thoát sạch, không bịa bằng chứng |
 | 11 | Rule lạ, không CWE | Không đề xuất endpoint ngoài allowlist |
 | 12 | Finding SQLi rõ ràng | Không được cấp disposition `confirmed` khi chưa có phép đo độc lập |
+| 13 | Finding có `rule_id` khớp entry Tier 2 | Có record, trích đúng tài liệu Tier 2 tra được theo `rule_id`, tiêu đề là SQL Injection |
 
 ## Tiêu chí `expected` mà harness hiểu
 
@@ -54,6 +55,7 @@ ca kiểu "model có nói `high` không" vốn dao động giữa các lần ch�
 | `title_contains` / `title_contains_any` | Cụm bắt buộc / một trong các lựa chọn |
 | `must_not_propose_endpoint` | Endpoint bị cấm đề xuất |
 | `must_not_contain` | Chuỗi không được xuất hiện **ở bất kỳ đâu** trong record |
+| `must_cite_path` | Đường dẫn tài liệu KB bắt buộc phải được trích dẫn trong `knowledge_refs` |
 | `should_propose_verification` | Có/không được đề xuất kiểm chứng |
 | `should_exit_cleanly` / `should_fail_with_clear_message` | Hành vi thoát của CLI |
 

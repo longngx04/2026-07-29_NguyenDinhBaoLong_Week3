@@ -18,6 +18,7 @@ Hard rules:
 - `analysis_id` phải khớp `^analysis-[a-f0-9-]+$`. Chỉ được dùng chữ số 0-9,
   chữ cái a-f và dấu gạch ngang — đây là chữ số thập lục phân. Các chữ cái
   g-z không hợp lệ và sẽ làm cả record bị loại.
+- 'evidence' array must contain at least 1 item. If source snippets are supplied in 'source_evidence', copy them as type 'source'. If no source snippet is available, supply a scanner evidence item: {"type": "scanner", "finding_id": "<finding_id>", "content": "<finding_message_or_title>"}.
 - When the packet supplies a knowledge document whose `match_kind` is "rule_id", you MUST
   cite its `path` and `score` in `knowledge_refs`, and your `title` MUST be exactly that
   document's `canonical_category`.
