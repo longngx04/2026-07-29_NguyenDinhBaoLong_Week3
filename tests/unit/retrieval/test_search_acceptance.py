@@ -58,8 +58,6 @@ def test_search_xss_returns_xss_knowledge(knowledge_dir):
         ("Security Misconfiguration", "security-misconfiguration"),
         ("Vulnerable Components", "vulnerable-components"),
         ("HTML Tampering", "html-tampering"),
-        ("OWASP Top 10", "owasp-top10"),
-        ("OpenGrep SAST", "opengrep"),
     ],
 )
 def test_search_comprehensive_vulnerability_coverage(query: str, expected_keyword: str, knowledge_dir: Path):
@@ -68,6 +66,16 @@ def test_search_comprehensive_vulnerability_coverage(query: str, expected_keywor
     assert any(expected_keyword in path for path in paths), (
         f"Tìm '{query}' không chứa '{expected_keyword}' trong kết quả: {paths}"
     )
+
+
+def test_search_owasp_top_10(knowledge_dir: Path):
+    hits = search("OWASP Top 10", knowledge_dir=knowledge_dir, limit=3)
+    assert any("owasp-top10" in doc.path.as_posix() for _, doc, _ in hits)
+
+
+def test_search_opengrep_sast(knowledge_dir: Path):
+    hits = search("OpenGrep SAST", knowledge_dir=knowledge_dir, limit=3)
+    assert any("opengrep" in doc.path.as_posix() for _, doc, _ in hits)
 
 
 # 3. Tìm kiếm theo Identifier kỹ thuật (CWE, OWASP Category, Rule ID)
