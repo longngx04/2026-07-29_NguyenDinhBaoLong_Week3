@@ -199,6 +199,9 @@ server {
 server {
     listen 8081;
     access_log /dev/stdout sentinel_dast_access;
+    # Ghi ra CA HAI noi. stdout de `docker compose logs` van dung duoc khi go loi
+    # tren host; file de container `web` doc duoc bang chung ma khong can Docker.
+    access_log /var/log/sentinel/dast-access.log sentinel_dast_access;
     limit_req_status 429;
     # ZAP se gui body form. Nginx doc roi VUT no; WebGoat chi nhan body chinh
     # tac cua lane. 8k du cho form cua ZAP va xa duoi muc dang lo.

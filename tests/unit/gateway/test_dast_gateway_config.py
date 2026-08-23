@@ -66,3 +66,13 @@ def test_dast_mode_fails_loudly_without_a_key():
     assert "SENTINEL_GATEWAY_MODE" in script
     assert "SENTINEL_DAST_API_KEY" in script
     assert "exit 1" in script
+
+
+def test_dast_lane_also_writes_its_log_to_a_file():
+    """`docker compose logs` can Docker. Container web khong co Docker, nen bang
+    chung phai nam o mot file doc duoc qua volume."""
+    server = _dast_server()
+    assert "access_log /dev/stdout sentinel_dast_access;" in server, (
+        "Giu dong stdout de `docker compose logs` van dung duoc khi go loi tren host"
+    )
+    assert "access_log /var/log/sentinel/dast-access.log sentinel_dast_access;" in server

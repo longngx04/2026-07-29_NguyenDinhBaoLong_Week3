@@ -128,3 +128,39 @@ def test_dast_gateway_is_internal_and_readiness_uses_its_key(compose):
     assert "X-Sentinel-DAST-Key" in health
     assert "127.0.0.1:8081/WebGoat/actuator/health" in health
     assert "localhost:8081" not in health, "BusyBox resolves localhost to ::1"
+
+
+def test_zap_api_never_reaches_the_host(compose):
+    """API cua ZAP dieu khien duoc mot trinh duyet tan cong. No khong duoc ra host."""
+    zap = compose["services"]["zap"]
+    assert "ports" not in zap, (
+        "zap khai 'ports' — API se bind len host. Chi duoc dung 'expose'."
+    )
+    assert zap.get("expose") == ["8090"]
+
+
+def test_zap_runs_as_a_daemon_with_a_key_from_the_environment(compose):
+    command = " ".join(compose["services"]["zap"].get("command", "").split())
+    assert "-daemon" in command
+    assert "api.key=${SENTINEL_ZAP_API_KEY}" in command, (
+        "Khoa API phai lay tu bien moi truong, khong duoc la hang trong file"
+    )
+
+
+def test_zap_still_only_ever_targets_the_dast_gateway(compose):
+    """Bat bien cu, phai con xanh sau khi doi sang daemon."""
+    rendered = yaml.safe_dump(compose["services"]["zap"], allow_unicode=True)
+    assert "webgoat" not in rendered, "ZAP khong bao gio duoc nham thang WebGoat"
+
+
+def test_dast_log_volume_is_shared_and_web_can_only_read_it(compose):
+    """Day la BANG CHUNG. Tien trinh doc no khong duoc phep sua no."""
+    assert "sentinel-dast-log" in (compose.get("volumes") or {})
+
+    gateway_dast = compose["services"]["gateway-dast"]["volumes"]
+    assert any("sentinel-dast-log:/var/log/sentinel" in v for v in gateway_dast)
+
+    web = compose["services"]["web"]["volumes"]
+    ro = [v for v in web if "sentinel-dast-log" in v]
+    assert ro, "web phai mount volume log"
+    assert ro[0].endswith(":ro"), f"web phai mount CHI DOC, dang la {ro[0]}"
