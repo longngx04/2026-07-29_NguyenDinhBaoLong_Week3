@@ -1,7 +1,7 @@
 # Đo đạc hiệu năng và chất lượng: Kho tri thức hai tầng (Two-Tier KB)
 
 **Ngày:** 2026-08-23 · **Lần chạy đo mới nhất:** `20260823T062936Z` (và đối chiếu baseline `20260822T205249Z`) · **Model:** `qwen/qwen3-235b-a22b-2507`  
-**Plan:** `docs/superpowers/plans/2026-08-23-knowledge-base-two-tier.md` · **Task:** Task 8 + C1–C3 Fixes
+**Plan:** `docs/superpowers/plans/2026-08-23-knowledge-base-two-tier.md` · **Task:** Task 8 + C1–C3 Fixes + B1–B3 Alignment
 
 ---
 
@@ -22,11 +22,13 @@ Truy xuất được thực hiện qua cơ chế thác nước tất định ba 
 | **Tỷ lệ record trích ≥ 1 Tier 2** | **0,0%** (0/21) | **59,4%** (19/32) | **82,4%** (28/34) | **+82,4%** — Đại đa số record trích dẫn tài liệu sink/header cụ thể |
 | **Tổng tỷ lệ trích dẫn KB** | ~0,0% | **62,5%** (20/32) | **94,1%** (32/34) | **+94,1%** — Căn cứ phân tích có nguồn trích dẫn rõ ràng |
 | **Độ chính xác category (`category`)** | **100,0%** (18/18) | **100,0%** (18/18) | **100,0%** (21/21) | Giữ vững 100% nhờ Luật 11 chuẩn hóa tên loại lỗ hổng |
-| **Over-claim rate** | **40,0%** (2/5 FP) | **40,0%** (2/5 FP) | **20,0%** (1/5 FP) | **Giảm 50% số ca over-claim** (chỉ còn `opengrep-016`) nhờ C1 chuyển giao đầy đủ `not_exploitable_when` |
+| **Over-claim rate** | **40,0%** (2/5 FP) | **40,0%** (2/5 FP) | **20,0%** (1/5 FP) | Giảm từ 2/5 xuống 1/5 FP (chỉ còn `opengrep-016`) sau khi C1 chuyển giao `not_exploitable_when` |
+| **Severity đúng vs nhãn** | **71,4%** | **28,6%** | **28,6%** (6/21) | Giảm do hàng rào kép `attacker_control` (kẹp `not_proven` + trần severity kéo xuống `medium`), không phải do KB |
+| **Attacker Control đúng vs nhãn** | **76,2%** | **38,1%** | **38,1%** (8/21) | Giảm do hàng rào kẹp cứng về `not_proven` khi chưa có phép đo độc lập (đổi lấy over-claim thấp) |
 | **Triage Accuracy (Label accuracy)** | **57,1%** | **50,0%** | **47,6%** | Dao động thông thường của LLM trên 23 finding WebGoat |
 | **Scanner Recall (WebGoat)** | **18,7%** (14/75) | **18,7%** (14/75) | **18,7%** (14/75) | Không đổi — phụ thuộc vào số rule OpenGrep |
 | **End-to-end Recall** | **18,7%** (14/75) | **16,0%** (12/75) | **18,7%** (14/75) | 100% các lỗ hổng scanner tìm thấy đều tới được báo cáo cuối |
-| **Bộ ca đánh giá (Eval Suite)** | 12 ca (97,2%) | 13 ca (97,4%) | **13 ca (97,4% - 38/39 lượt)** | Ca 13 (`13-tier2-citation`) đạt **100% (3/3)** |
+| **Bộ ca đánh giá (Eval Suite)** | 12 ca (97,2%) | 13 ca (97,4%) | **13 ca (97,4% - 38/39 lượt)** | Ca 07 (`dast-finding`) và Ca 13 (`tier2-citation`) đạt **100% (3/3)** |
 
 ---
 
@@ -60,6 +62,6 @@ Không có bất kỳ nhóm nào bị từ chối do Luật 10 (`must_cite`) hay
 - **Nguyên nhân over-claim rate đứng yên ở lần đo ban đầu (40,0%):**
   Trong lần chạy ban đầu `20260822T205249Z`, over-claim rate không thay đổi do lỗi C1: trường `not_exploitable_when` nằm trong frontmatter bị loại bỏ khỏi `body` khi nạp, đồng thời `snippet` bị cắt ngắn ở 700 ký tự (chỉ giữ lại mục "Cơ chế rủi ro" vốn thúc đẩy kết luận có lỗ hổng, cắt mất mục "Biện pháp khắc phục"). Do đó model chưa thực sự nhận được các ranh giới an toàn.
 - **Kết quả sau khi khắc phục lỗi phân phối tri thức (C1):**
-  Sau khi đưa `not_exploitable_when`, `exploitable_when`, `safe_alternative` trực tiếp vào payload và mở rộng giới hạn trích đoạn Tier 2 lên 4000 ký tự, over-claim rate trên bộ nhãn WebGoat đã **giảm từ 40,0% xuống 20,0%** (chỉ còn 1 ca false positive duy nhất `opengrep-016` bị đánh giá lỏng, ca `opengrep-014` đã được phân tích chuẩn xác).
-- **Dao động nhãn (Label Accuracy):**
-  Label accuracy ghi nhận 57,1% $\rightarrow$ 47,6% là sự dao động tự nhiên của mô hình ngôn ngữ lớn khi đánh giá đa chiều (severity + confidence + attacker_control) trên tập mẫu nhỏ 23 finding thật, không phải do cơ chế lọc hay luật KB gây ra.
+  Sau khi đưa `not_exploitable_when`, `exploitable_when`, `safe_alternative` trực tiếp vào payload và mở rộng giới hạn trích đoạn Tier 2 lên 4000 ký tự, over-claim rate trên bộ nhãn WebGoat đã giảm từ 40,0% xuống 20,0% (từ 2/5 xuống 1/5 false positive — đúng 1 ca `opengrep-014` được sửa, còn `opengrep-016` vẫn bị đánh giá lỏng). Với cỡ mẫu nhỏ 5 ca FP, đây là tín hiệu tích cực của việc bổ sung ranh giới an toàn, nhưng chưa thể khẳng định chắc chắn mối quan hệ nhân quả tuyệt đối nếu chỉ dựa trên 1 lần chạy; cần tiếp tục chạy lặp để quan sát phân bố thống kê.
+- **Dao động nhãn (Label Accuracy) và Ảnh hưởng của Hàng rào kép:**
+  Label accuracy ghi nhận 57,1% $\rightarrow$ 47,6% và độ chính xác severity giảm (71,4% $\rightarrow$ 28,6%) là hệ quả trực tiếp của **hàng rào kép `attacker_control`** (áp trần `medium` khi chưa có phép đo độc lập) và sự dao động tự nhiên của mô hình khi đánh giá đa chiều trên tập mẫu 23 finding thật, không phải do cơ chế tra cứu KB gây ra.
