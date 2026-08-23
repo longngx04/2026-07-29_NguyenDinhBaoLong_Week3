@@ -7,7 +7,7 @@ owasp: [A01:2021]
 tags: [example, path-traversal, lfi, cwe-22, directory-traversal, a01, file-handling]
 references:
   - https://owasp.org/Top10/A01_2021-Broken_Access_Control/
-  - https://cheatsheetseries.owasp.org/cheatsheets/File_Inclusion_Cheat_Sheet.html
+  - https://owasp.org/www-community/attacks/Path_Traversal
   - https://cwe.mitre.org/data/definitions/22.html
 ---
 
@@ -65,5 +65,5 @@ Chiến lược phòng chống Path Traversal bao gồm các lớp bảo vệ:
 ## 4. Tài liệu tham khảo thẩm quyền (Authoritative References)
 
 - [OWASP Top 10:2021 — A01: Broken Access Control](https://owasp.org/Top10/A01_2021-Broken_Access_Control/)
-- [OWASP File Inclusion Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Inclusion_Cheat_Sheet.html)
+- [OWASP Path Traversal Attack Guide](https://owasp.org/www-community/attacks/Path_Traversal)
 - [CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)

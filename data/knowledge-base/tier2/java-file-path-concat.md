@@ -17,7 +17,7 @@ not_exploitable_when: >
   đường dẫn đã được chuẩn hoá qua Path.toRealPath() hoặc normalize() và xác thực
   nằm hoàn toàn bên trong thư mục gốc cho phép (base directory check)
 references:
-  - https://cheatsheetseries.owasp.org/cheatsheets/File_Path_Traversal_Cheat_Sheet.html
+  - https://owasp.org/www-community/attacks/Path_Traversal
   - https://cwe.mitre.org/data/definitions/22.html
   - https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/file/Path.html
 ---
@@ -78,7 +78,7 @@ Nếu ứng dụng trích xuất chỉ lấy tên tệp bằng `FilenameUtils.ge
 
 ## 4. Tài liệu tham khảo (References)
 
-- [OWASP File Path Traversal Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Path_Traversal_Cheat_Sheet.html)
+- [OWASP Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal)
 - [CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
 - [Oracle Java SE 17: java.nio.file.Path API Documentation](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/file/Path.html)
 

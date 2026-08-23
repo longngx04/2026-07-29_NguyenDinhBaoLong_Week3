@@ -227,6 +227,7 @@ Bộ nhãn recall lấy từ nguồn ngoài — nguồn gốc và bản quyền:
 make quality        # ruff + mypy + coverage (ngưỡng 78 %) + dependency audit
 make lint           # riêng ruff
 make typecheck      # riêng mypy
+make kb-links       # kiểm URL trích dẫn trong KB còn sống không (cần mạng)
 ```
 
 CI chạy đúng bộ lệnh này trong job `quality-gates`.

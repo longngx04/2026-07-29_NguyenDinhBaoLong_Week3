@@ -17,7 +17,7 @@ not_exploitable_when: >
   parser luôn cấu hình khoá ký tường minh qua setSigningKey()/verifyWith() và kiểm tra
   chữ ký với parseClaimsJws() trước khi đọc claims
 references:
-  - https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html
+  - https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet.html
   - https://github.com/jwtk/jjwt
   - https://cwe.mitre.org/data/definitions/347.html
 ---
@@ -91,6 +91,6 @@ Nếu bộ parser đã được cấu hình khoá ký bí mật thông qua `setS
 
 ## 4. Tài liệu tham khảo (References)
 
-- [OWASP JSON Web Token Cheat Sheet for Java](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html)
+- [OWASP JSON Web Token Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet.html)
 - [JJWT Documentation: Reading a JWS](https://github.com/jwtk/jjwt)
 - [CWE-347: Improper Verification of Cryptographic Signature](https://cwe.mitre.org/data/definitions/347.html)

@@ -7,7 +7,7 @@ owasp: [A02:2021, A07:2021]
 tags: [example, jwt, authentication, integrity, cwe-347, cryptographic-failures, broken-auth]
 references:
   - https://owasp.org/Top10/A02_2021-Cryptographic_Failures/
-  - https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html
+  - https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet.html
   - https://cwe.mitre.org/data/definitions/347.html
 ---
 
@@ -58,5 +58,5 @@ Chiến lược phòng chống xác thực JWT yếu bao gồm:
 ## 4. Tài liệu tham khảo thẩm quyền (Authoritative References)
 
 - [OWASP Top 10:2021 — A02: Cryptographic Failures](https://owasp.org/Top10/A02_2021-Cryptographic_Failures/)
-- [OWASP JSON Web Token for Java Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html)
+- [OWASP JSON Web Token Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_Cheat_Sheet.html)
 - [CWE-347: Improper Verification of Cryptographic Signature](https://cwe.mitre.org/data/definitions/347.html)
