@@ -360,6 +360,7 @@ project-sentinel/
 | You are | Start here |
 | :--- | :--- |
 | Grading this project | [`reports/week-06/report.md`](reports/week-06/report.md) |
+| About to demonstrate it | [`docs/demo-guide.md`](docs/demo-guide.md) |
 | Deciding whether to use it | [`docs/product-brief.md`](docs/product-brief.md) |
 | Reviewing the security design | [`docs/architecture.md`](docs/architecture.md) |
 | About to trust a number | [`docs/limitations.md`](docs/limitations.md) |

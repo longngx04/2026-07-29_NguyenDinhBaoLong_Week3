@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
     "docs/target-webgoat.md",
     "docs/product-brief.md",
     "docs/limitations.md",
+    "docs/demo-guide.md",
     "eval/README.md",
     "exercises/week4-gateway/README.md",
     "reports/week-05/report.md",
@@ -88,3 +89,11 @@ def test_readme_noi_ve_hai_tang_va_lenh_do_phu():
     assert "make kb-coverage" in text
 
 
+
+
+def test_demo_guide_covers_all_seven_required_items():
+    """De bai doi ban demo the hien du bay dieu. Tai lieu huong dan phai noi het."""
+    text = (REPO_ROOT / "docs" / "demo-guide.md").read_text(encoding="utf-8").lower()
+    for item in ["quét", "báo cáo", "đề xuất", "approve", "reject",
+                 "gateway", "injection", "che"]:
+        assert item in text, f"Huong dan demo thieu hang muc: {item}"

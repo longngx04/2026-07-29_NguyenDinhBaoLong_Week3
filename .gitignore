@@ -64,3 +64,7 @@ reports/week-04/artifacts/auto-review-*.md
 # Kich ban demo la ghi chu rieng cua nguoi trinh bay, khong phai
 # deliverable cho nguoi cham.
 docs/demo-script.md
+
+# Ghi chu qua trinh lam viec — de doc lai, khong phai deliverable cho nguoi cham.
+worklog/
+docs/superpowers/

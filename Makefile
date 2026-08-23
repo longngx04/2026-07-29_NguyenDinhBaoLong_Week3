@@ -2,7 +2,7 @@ SHELL := /usr/bin/env bash
 .SHELLFLAGS := -eu -o pipefail -c
 PYTHON := $(shell command -v .venv/bin/python3 2>/dev/null || command -v python3)
 
-.PHONY: up down target-up target-down scan scan-opengrep dast scan-zap normalize normalize-zap scan-all analyze-dast dast-test search kb-coverage kb-links analyze validate-analysis agent-test llm-test probe run runs clean-runs eval gateway-build gateway-up gateway-reset gateway-down gateway-test gateway-live-test gateway-demo exercise-test guardrails-test guardrails-demo score-ground-truth lint typecheck coverage dep-audit self-scan quality refresh-recall-truth web web-docker
+.PHONY: up down target-up target-down scan scan-opengrep dast scan-zap normalize normalize-zap scan-all dast-test search kb-coverage kb-links analyze validate-analysis agent-test llm-test probe run runs clean-runs eval gateway-up gateway-reset gateway-down gateway-test gateway-live-test gateway-demo exercise-test guardrails-test guardrails-demo score-ground-truth lint typecheck coverage dep-audit quality refresh-recall-truth web
 
 # Week 4 tests exercise the real Gateway and WebGoat.  The dependency starts
 # both services and waits for the allowlisted health endpoint before pytest.
@@ -92,12 +92,6 @@ scan-all: scan-opengrep normalize scan-zap normalize-zap
 	  --input artifacts/normalized/zap-findings.json \
 	  --output artifacts/normalized/all-findings.json
 
-analyze-dast: dast
-	@$(PYTHON) -m project_sentinel.cli analyze \
-	  --input artifacts/normalized/zap-findings.json \
-	  --output artifacts/analysis/zap-security-analysis.jsonl \
-	  --summary artifacts/analysis/zap-run-summary.json
-
 dast-test: dast
 	@$(PYTHON) -m pytest tests/integration/test_zap_gateway_live.py -v
 
@@ -175,10 +169,6 @@ dep-audit:
 	@$(PYTHON) -m pip_audit --requirement requirements.txt --progress-spinner off
 
 # SAST tren chinh Project Sentinel, khong phai tren WebGoat.
-self-scan:
-	@$(PYTHON) -m ruff check --select S src eval 2>/dev/null || true
-	@$(PYTHON) -m bandit -q -r src/project_sentinel -f screen 2>/dev/null \
-	  || printf '%s\n' 'bandit chua cai — bo qua (CI van chay bandit)'
 
 quality: lint typecheck coverage dep-audit
 
@@ -193,11 +183,6 @@ clean-runs:
 	cd artifacts/runs 2>/dev/null || exit 0; \
 	ls -1d */ 2>/dev/null | sort -r | tail -n +$$((KEEP+1)) | xargs -r rm -rf; \
 	printf 'Giữ lại %s lần chạy mới nhất.\n' "$$KEEP"
-
-gateway-build:
-	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
-	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
-	SENTINEL_GATEWAY_API_KEY="$$KEY" docker compose --profile target build gateway
 
 gateway-up: target-up
 
@@ -254,9 +239,6 @@ guardrails-test:
 
 web:
 	@$(PYTHON) -m uvicorn project_sentinel.web.main:app --host 127.0.0.1 --port 8000 --reload
-
-web-docker:
-	@docker compose --profile app up --build
 
 up:
 	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
