@@ -133,6 +133,8 @@ services:
       - SENTINEL_DAST_API_KEY=${SENTINEL_DAST_API_KEY:-}
       - SENTINEL_ZAP_API_KEY=${SENTINEL_ZAP_API_KEY:-}
       - SENTINEL_ZAP_URL=http://zap:8090
+      # Trong mang Docker, Gateway ten la `gateway`, khong phai 127.0.0.1.
+      - SENTINEL_GATEWAY_URL=http://gateway:8080
     volumes:
       - ./artifacts:/app/artifacts
       # Chi doc: day la bang chung, tien trinh doc no khong duoc sua no.

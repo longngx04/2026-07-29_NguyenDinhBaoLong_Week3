@@ -91,3 +91,31 @@ def test_invalid_payload_kind_is_denied_before_transport(allowlist, tmp_path, ju
     contents = log_path.read_text(encoding="utf-8")
     assert '"policy_decision": "DENIED"' in contents
     assert '"error_class": "InvalidPayloadKind"' in contents
+
+
+def test_gateway_origin_doc_duoc_tu_bien_moi_truong(monkeypatch):
+    """Trong container `web`, `127.0.0.1:9080` la chinh no — khong co gi lang nghe.
+    Gateway o day ten la `gateway:8080`. Khong ghi de duoc thi buoc probe khong bao
+    gio chay duoc tu giao dien."""
+    import importlib
+
+    import project_sentinel.probe.tool as tool
+
+    monkeypatch.setenv("SENTINEL_GATEWAY_URL", "http://gateway:8080")
+    try:
+        reloaded = importlib.reload(tool)
+        assert reloaded.GATEWAY_ORIGIN == "http://gateway:8080"
+    finally:
+        monkeypatch.delenv("SENTINEL_GATEWAY_URL", raising=False)
+        importlib.reload(tool)
+
+
+def test_gateway_origin_giu_nguyen_mac_dinh_khi_khong_dat_bien(monkeypatch):
+    """Duong chay tren host khong duoc doi hanh vi."""
+    import importlib
+
+    import project_sentinel.probe.tool as tool
+
+    monkeypatch.delenv("SENTINEL_GATEWAY_URL", raising=False)
+    reloaded = importlib.reload(tool)
+    assert reloaded.GATEWAY_ORIGIN == "http://127.0.0.1:9080"
