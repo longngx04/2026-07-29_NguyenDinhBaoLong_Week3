@@ -108,6 +108,10 @@ services:
       - SENTINEL_GATEWAY_API_KEY=${SENTINEL_GATEWAY_API_KEY:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - SENTINEL_DEMO_RUN=${SENTINEL_DEMO_RUN:-}
+      # Web dieu khien ZAP qua API noi bo; no KHONG co Docker CLI va socket.
+      - SENTINEL_DAST_API_KEY=${SENTINEL_DAST_API_KEY:-}
+      - SENTINEL_ZAP_API_KEY=${SENTINEL_ZAP_API_KEY:-}
+      - SENTINEL_ZAP_URL=http://zap:8090
     volumes:
       - ./artifacts:/app/artifacts
       # Chi doc: day la bang chung, tien trinh doc no khong duoc sua no.
