@@ -108,3 +108,37 @@ def test_keyword_search_khong_bao_gio_tra_ve_doc_tier2():
     for hit in hits:
         if hit.match_kind == "keyword":
             assert "/tier2/" not in hit.path
+
+
+def test_hit_tier2_mang_theo_dieu_kien_khong_khai_thac_duoc():
+    """Prompt dan agent dung `not_exploitable_when`; no phai co that trong packet."""
+    h = [
+        x
+        for x in retrieve_knowledge(
+            title="Potential SQL injection",
+            rule_id="java-sql-statement-execution",
+            cwe=["CWE-89"],
+            knowledge_dir=TIER1,
+        )
+        if x.tier == 2
+    ][0]
+    payload = h.to_dict()
+    assert payload["not_exploitable_when"], "Truong nay bi cat thi prompt dan hut"
+    assert payload["exploitable_when"]
+    assert payload["safe_alternative"]
+
+
+def test_than_tai_lieu_tier2_toi_duoc_muc_khac_phuc():
+    """Chi gui muc 1 la chi gui nua THUC DAY ket luan co lo hong."""
+    h = [
+        x
+        for x in retrieve_knowledge(
+            title="Potential SQL injection",
+            rule_id="java-sql-statement-execution",
+            cwe=["CWE-89"],
+            knowledge_dir=TIER1,
+        )
+        if x.tier == 2
+    ][0]
+    assert "## 3. Biện pháp khắc phục" in h.snippet
+

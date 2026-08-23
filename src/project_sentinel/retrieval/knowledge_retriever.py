@@ -19,6 +19,7 @@ from project_sentinel.retrieval.tier_lookup import lookup_tier2
 # đối chiếu score agent trích với score hệ thống tính, nên nó phải tất định.
 TIER2_SCORE = 100.0
 PARENT_SCORE = 50.0
+TIER2_SNIPPET_CHARS = 4000  # đủ để qua mục "## 3. Biện pháp khắc phục"
 
 
 @dataclass
@@ -31,9 +32,15 @@ class RetrievalHit:
     tier: int = 1
     match_kind: str = "keyword"
     canonical_category: str = ""
+    exploitable_when: str = ""
+    not_exploitable_when: str = ""
+    safe_alternative: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert hit to dictionary payload for LLM analysis packet or output record."""
+        # Ba trường này nằm ở frontmatter nên KHÔNG có trong body. Trước đây chúng bị
+        # cắt mất, khiến prompt dặn agent dùng `not_exploitable_when` — một trường
+        # chưa bao giờ được gửi. Đo được: over-claim rate đứng yên 40% vì lý do này.
         return {
             "path": self.path,
             "title": self.title,
@@ -42,6 +49,9 @@ class RetrievalHit:
             "tier": self.tier,
             "match_kind": self.match_kind,
             "canonical_category": self.canonical_category,
+            "exploitable_when": self.exploitable_when,
+            "not_exploitable_when": self.not_exploitable_when,
+            "safe_alternative": self.safe_alternative,
         }
 
 
@@ -82,10 +92,13 @@ def retrieve_knowledge(
                 path=entry.path.as_posix(),
                 title=entry.canonical_category,
                 score=TIER2_SCORE,
-                snippet=entry.body[:max_snippet_chars],
+                snippet=entry.body[:TIER2_SNIPPET_CHARS],
                 tier=2,
                 match_kind=match_kind,
                 canonical_category=entry.canonical_category,
+                exploitable_when=entry.exploitable_when,
+                not_exploitable_when=entry.not_exploitable_when,
+                safe_alternative=entry.safe_alternative,
             )
         )
         parent_path = tier1_dir / f"{entry.tier1_parent}.md"
