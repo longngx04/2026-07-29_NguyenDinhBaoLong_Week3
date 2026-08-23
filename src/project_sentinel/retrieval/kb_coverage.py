@@ -70,12 +70,23 @@ def build_report(
     known_rules = _known_rule_ids(rules_file)
     truth, truth_total = _truth_counts(truth_file)
 
-    with_rule = [
+    sast_entries = [
         entry
         for entry in entries
         if any(rule in known_rules for rule in entry.matches_rule_ids)
     ]
-    without_rule = [entry for entry in entries if entry not in with_rule]
+    dast_entries = [
+        entry
+        for entry in entries
+        if any(rule.isdigit() for rule in entry.matches_rule_ids)
+    ]
+    no_rule_entries = [
+        entry
+        for entry in entries
+        if entry not in sast_entries and entry not in dast_entries
+    ]
+    with_rule = sast_entries + dast_entries
+    without_rule = no_rule_entries
 
     gaps_by_cwe: dict[str, list[str]] = collections.defaultdict(list)
     for entry in without_rule:
@@ -98,7 +109,12 @@ def build_report(
     return {
         "entries": len(entries),
         "with_rule": len(with_rule),
+        "with_sast": len(sast_entries),
+        "with_dast": len(dast_entries),
         "without_rule": len(without_rule),
+        "sast_entries": len(sast_entries),
+        "dast_entries": len(dast_entries),
+        "no_rule_entries": len(no_rule_entries),
         "gaps": gaps,
         "cwe_reach": cwe_reach,
         "truth_total": truth_total,
@@ -114,6 +130,7 @@ def render(report: dict[str, Any]) -> str:
     lines = [
         "=== KB Tier 2 ===",
         f"  Entry              : {report['entries']}",
+        f"  Entry neo theo SAST: {report['with_sast']} | neo theo DAST: {report['with_dast']} | chưa có rule: {report['without_rule']}",
         f"  Có rule            : {report['with_rule']}",
         f"  Chưa có rule       : {report['without_rule']}",
         "",

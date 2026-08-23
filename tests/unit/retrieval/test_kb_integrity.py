@@ -17,6 +17,7 @@ EXPECTED_TIER1_IDS = {
     "path-traversal", "insecure-deserialization", "jwt-weak-verification",
     "broken-auth", "ssrf", "xxe", "html-tampering",
     "security-misconfiguration", "vulnerable-components",
+    "security-headers", "information-disclosure", "caching-policy",
 }
 
 
@@ -38,7 +39,7 @@ def test_thu_muc_vulnerabilities_cu_da_bien_mat():
     )
 
 
-def test_tier1_co_dung_muoi_bon_doc_va_dung_id():
+def test_tier1_co_dung_muoi_bay_doc_va_dung_id():
     ids = {_frontmatter(p)["id"] for p in TIER1.glob("*.md")}
     assert ids == EXPECTED_TIER1_IDS
 
@@ -48,8 +49,8 @@ def test_moi_doc_tier1_khai_dung_tier():
         assert _frontmatter(path)["tier"] == 1, f"{path.name}"
 
 
-def test_co_dung_muoi_mot_entry_tier2():
-    assert len(load_tier2(TIER2)) == 11
+def test_co_dung_muoi_lam_entry_tier2():
+    assert len(load_tier2(TIER2)) == 15
 
 
 def test_moi_tier1_parent_tro_toi_doc_co_that():
@@ -64,7 +65,7 @@ def test_moi_rule_id_duoc_khai_deu_ton_tai_that():
     known = _rule_ids()
     for entry in load_tier2(TIER2):
         for rule_id in entry.matches_rule_ids:
-            assert rule_id in known, f"{entry.id}: rule '{rule_id}' khong co that"
+            assert rule_id in known or rule_id.isdigit(), f"{entry.id}: rule '{rule_id}' khong co that"
 
 
 def test_entry_khong_co_rule_phai_danh_dau_no_rule_yet():
@@ -103,7 +104,7 @@ def test_moi_entry_neu_duoc_dieu_kien_khong_khai_thac_duoc():
 
 
 def test_moi_entry_tier2_co_du_bon_de_muc_chuan():
-    """Kiem tra 100% 11 file Tier 2 deu co du 4 de muc chuan:
+    """Kiem tra 100% 15 file Tier 2 deu co du 4 de muc chuan:
     1. Co che rui ro
     2. Ma nguon minh hoa
     3. Bien phap khac phuc chuan
@@ -119,7 +120,7 @@ def test_moi_entry_tier2_co_du_bon_de_muc_chuan():
         "## 4. Tài liệu tham khảo",
     ]
     tier2_files = list(TIER2.glob("*.md"))
-    assert len(tier2_files) == 11, f"Ky vong 11 file Tier 2 nhung tim thay {len(tier2_files)}"
+    assert len(tier2_files) == 15, f"Ky vong 15 file Tier 2 nhung tim thay {len(tier2_files)}"
     for path in tier2_files:
         content = path.read_text(encoding="utf-8")
         for heading in required_headings:
@@ -127,15 +128,15 @@ def test_moi_entry_tier2_co_du_bon_de_muc_chuan():
 
 
 def test_moi_entry_tier2_co_code_block_vulnerable_va_remediated():
-    """Kiem tra 100% 11 file Tier 2 deu co:
+    """Kiem tra 100% 15 file Tier 2 deu co:
     - ### ❌ Không an toàn
     - ### ✅ Đã khắc phục an toàn
-    - Chua it nhat mot code block ```java hoac ```html
+    - Chua it nhat mot code block ```java, ```html, hoac ```http
 
     Bat buoc de Web UI va ky su bao mat co ma doi chung truc quan, khong phong doan.
     """
     tier2_files = list(TIER2.glob("*.md"))
-    assert len(tier2_files) == 11, f"Ky vong 11 file Tier 2 nhung tim thay {len(tier2_files)}"
+    assert len(tier2_files) == 15, f"Ky vong 15 file Tier 2 nhung tim thay {len(tier2_files)}"
     for path in tier2_files:
         content = path.read_text(encoding="utf-8")
         assert "### ❌ Không an toàn" in content, (
@@ -144,20 +145,20 @@ def test_moi_entry_tier2_co_code_block_vulnerable_va_remediated():
         assert "### ✅ Đã khắc phục an toàn" in content, (
             f"{path.name}: thieu de muc mau khac phuc '### ✅ Đã khắc phục an toàn'"
         )
-        assert "```java" in content or "```html" in content, (
-            f"{path.name}: phai chua it nhat mot khoi code ```java hoac ```html"
+        assert "```java" in content or "```html" in content or "```http" in content, (
+            f"{path.name}: phai chua it nhat mot khoi code ```java, ```html, hoac ```http"
         )
 
 
 def test_moi_entry_tier2_khai_references_url_hop_le():
-    """Kiem tra 100% 11 file Tier 2 deu co references (danh sach >= 1 URL)
+    """Kiem tra 100% 15 file Tier 2 deu co references (danh sach >= 1 URL)
     va moi URL deu bat dau bang http:// hoac https://.
 
     Bat buoc de chong troi lien ket tham quyen (OWASP, CWE, Oracle docs),
     phuc vu tao badge lien ket tren Web UI.
     """
     tier2_files = list(TIER2.glob("*.md"))
-    assert len(tier2_files) == 11, f"Ky vong 11 file Tier 2 nhung tim thay {len(tier2_files)}"
+    assert len(tier2_files) == 15, f"Ky vong 15 file Tier 2 nhung tim thay {len(tier2_files)}"
     for path in tier2_files:
         fm = _frontmatter(path)
         refs = fm.get("references")
@@ -171,13 +172,13 @@ def test_moi_entry_tier2_khai_references_url_hop_le():
 
 
 def test_moi_doc_tier1_co_du_bon_de_muc_chuan():
-    """Kiem tra 100% 14 file Tier 1 deu co du 4 de muc chuan:
+    """Kiem tra 100% 17 file Tier 1 deu co du 4 de muc chuan:
     1. Khai niem & Moi de doa
     2. Cac bien the pho bien
     3. Nguyen tac phong thu da lop
     4. Tai lieu tham khao tham quyen
 
-    Giup duy tri cau truc tai lieu phan loai lo hong dong bo cho toan bo 14 lop CWE/OWASP.
+    Giup duy tri cau truc tai lieu phan loai lo hong dong bo cho toan bo 17 lop CWE/OWASP.
     """
     required_headings = [
         "## 1. Khái niệm & Mối đe dọa",
@@ -186,7 +187,7 @@ def test_moi_doc_tier1_co_du_bon_de_muc_chuan():
         "## 4. Tài liệu tham khảo thẩm quyền",
     ]
     tier1_files = list(TIER1.glob("*.md"))
-    assert len(tier1_files) == 14, f"Ky vong 14 file Tier 1 nhung tim thay {len(tier1_files)}"
+    assert len(tier1_files) == 17, f"Ky vong 17 file Tier 1 nhung tim thay {len(tier1_files)}"
     for path in tier1_files:
         content = path.read_text(encoding="utf-8")
         for heading in required_headings:
@@ -194,13 +195,13 @@ def test_moi_doc_tier1_co_du_bon_de_muc_chuan():
 
 
 def test_moi_doc_tier1_khai_references_url_hop_le():
-    """Kiem tra 100% 14 file Tier 1 deu co truong references trong frontmatter
+    """Kiem tra 100% 17 file Tier 1 deu co truong references trong frontmatter
     va moi URL deu hop le (bat dau bang http:// hoac https://).
 
     Giup lien ket truc tiep toi OWASP Top 10 va CWE Definitions.
     """
     tier1_files = list(TIER1.glob("*.md"))
-    assert len(tier1_files) == 14, f"Ky vong 14 file Tier 1 nhung tim thay {len(tier1_files)}"
+    assert len(tier1_files) == 17, f"Ky vong 17 file Tier 1 nhung tim thay {len(tier1_files)}"
     for path in tier1_files:
         fm = _frontmatter(path)
         refs = fm.get("references")

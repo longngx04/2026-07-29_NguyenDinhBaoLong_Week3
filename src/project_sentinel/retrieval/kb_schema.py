@@ -25,6 +25,8 @@ CANONICAL_CATEGORIES: frozenset[str] = frozenset({
     "Hardcoded Credentials",
     "Insecure Randomness",
     "XXE",
+    "Security Misconfiguration",
+    "Information Disclosure",
 })
 
 _REQUIRED = (
