@@ -174,6 +174,8 @@
     var stations = document.querySelectorAll("#rail .station");
     if (!stations.length || !steps) return;
 
+    var isTerminal = (state === "DONE" || state === "FAILED" || state === "REJECTED");
+
     steps.forEach(function (step, index) {
       var station = stations[index];
       if (!station) return;
@@ -182,6 +184,15 @@
       // Dừng ở cổng phê duyệt không phải là "đang chạy": không có gì chuyển
       // động, hệ thống đang đợi một con người. Hai việc đó phải trông khác nhau.
       if (state === "AWAITING_APPROVAL" && step.name === "approval") status = "waiting";
+
+      // Khi toàn bộ lần chạy đã hoàn thành (DONE/FAILED/REJECTED), không bước nào được giữ trạng thái 'running'
+      if (isTerminal) {
+        if (state === "DONE" && (status === "running" || status === "pending")) {
+          status = "done";
+        } else if (status === "running") {
+          status = "failed";
+        }
+      }
 
       var previous = station.getAttribute("data-status");
       if (previous !== status) {
@@ -207,6 +218,10 @@
 
     var runId = root.getAttribute("data-run-id");
     var wasTerminal = root.getAttribute("data-terminal") === "true";
+    var runCreatedAt = root.getAttribute("data-created-at");
+    var startTimeMs = runCreatedAt ? new Date(runCreatedAt).getTime() : Date.now();
+    var liveTimer = null;
+
     var terminal = makeTerminal();
     var lamp = $("lamp");
     var idleMeter = $("idle-meter");
@@ -231,8 +246,33 @@
 
     if (terminal) terminal.bottom();
 
+    function startLiveClock() {
+      if (liveTimer || startTimeMs <= 0) return;
+      liveTimer = window.setInterval(function () {
+        if (stopped || wasTerminal) {
+          window.clearInterval(liveTimer);
+          liveTimer = null;
+          return;
+        }
+        var now = Date.now();
+        var elapsedSec = Math.max(0, (now - startTimeMs) / 1000);
+        if (clock) setText(clock, elapsedSec.toFixed(1));
+      }, 100);
+    }
+
+    function stopLiveClock(finalMs) {
+      if (liveTimer) {
+        window.clearInterval(liveTimer);
+        liveTimer = null;
+      }
+      if (clock && finalMs !== undefined && finalMs !== null) {
+        setText(clock, (finalMs / 1000).toFixed(1));
+      }
+    }
+
     function halt() {
       stopped = true;
+      stopLiveClock();
       if (timer) window.clearTimeout(timer);
       document.documentElement.classList.add("is-stalled");
     }
@@ -266,6 +306,7 @@
         document.documentElement.classList.remove("is-stalled");
         stopped = false;
         errorStreak = 0;
+        startLiveClock();
         poll();
       });
 
@@ -305,7 +346,7 @@
       errorSlot.appendChild(notice);
     }
 
-    function paintReadouts(metrics) {
+    function paintReadouts(metrics, state) {
       if (!metrics) return;
       Object.keys(readouts).forEach(function (key) {
         var el = readouts[key];
@@ -316,17 +357,24 @@
           el.classList.add("tick");
         }
       });
-      if (clock && metrics.total_elapsed_ms !== undefined) {
-        setText(clock, (metrics.total_elapsed_ms / 1000).toFixed(1));
+      var isTerminal = (state === "DONE" || state === "FAILED" || state === "REJECTED");
+      if (isTerminal || state === "AWAITING_APPROVAL") {
+        stopLiveClock(metrics.total_elapsed_ms);
+      } else {
+        startLiveClock();
       }
     }
 
     function finish() {
+      stopLiveClock();
       var wrap = $("railwrap");
       if (wrap) wrap.classList.add("sweep");
+      document.querySelectorAll("#rail .station[data-status='running']").forEach(function (el) {
+        el.setAttribute("data-status", "done");
+      });
       // Các tab bằng chứng do máy chủ dựng. Nạp lại một lần để chúng có nội
       // dung thật, thay vì dựng lại toàn bộ báo cáo bằng JavaScript.
-      window.setTimeout(function () { window.location.reload(); }, 900);
+      window.setTimeout(function () { window.location.reload(); }, 600);
     }
 
     function apply(data) {
@@ -345,7 +393,7 @@
       }
 
       paintStations(data.steps, data.state);
-      paintReadouts(data.metrics);
+      paintReadouts(data.metrics, data.state);
       if (terminal) terminal.render(data.log_lines);
       paintError(data.error);
 
@@ -417,7 +465,10 @@
       return;
     }
 
-    if (!wasTerminal) timer = window.setTimeout(poll, POLL_MS);
+    if (!wasTerminal) {
+      startLiveClock();
+      timer = window.setTimeout(poll, POLL_MS);
+    }
   }
 
   document.addEventListener("DOMContentLoaded", function () {

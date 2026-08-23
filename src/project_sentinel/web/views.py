@@ -403,6 +403,8 @@ def run_status(ctx: RunContext, run_id: str) -> dict:
         "terminal": record.state.is_terminal(),
         "awaiting_approval": record.state.value == "AWAITING_APPROVAL",
         "updated_at": record.updated_at,
+        "created_at": record.created_at,
+        "started_at": record.created_at,
         "steps": [
             {"index": s.index, "name": s.name, "status": s.status, "elapsed_ms": s.elapsed_ms}
             for s in record.steps
@@ -431,11 +433,7 @@ def run_status(ctx: RunContext, run_id: str) -> dict:
 
 
 def _first_loadable_run(ctx: RunContext, preferred: str | None) -> RunRecord | None:
-    """Lần chạy để hiển thị: ưu tiên `preferred`, nếu hỏng thì lùi về lần kế.
-
-    Một `state.json` hỏng KHÔNG được làm trắng cả bảng điều khiển. Bảng điều
-    khiển giờ là trang chủ, nên lỗi ở đây là lỗi ở lối vào duy nhất.
-    """
+    """Lần chạy để hiển thị: ưu tiên `preferred`, nếu hỏng thì lùi về lần kế."""
     candidates: list[str] = []
     if preferred:
         candidates.append(preferred)
@@ -450,33 +448,65 @@ def _first_loadable_run(ctx: RunContext, preferred: str | None) -> RunRecord | N
 
 
 def console_data(ctx: RunContext, run_id: str | None = None) -> dict:
-    """Toàn bộ một lần chạy trên MỘT trang: tiến trình, nhật ký, bằng chứng.
+    """Bảng điều khiển: trang mới khi mở web, hoặc chi tiết lần chạy khi chỉ định/đang chạy.
 
-    Khi không chỉ định `run_id`, chọn lần chạy được ghim cho demo, nếu không có
-    thì lần chạy mới nhất. Người xem không phải bấm qua trang nào để thấy trạng
-    thái hiện tại.
+    Khi người dùng mở trang chủ `/` (không truyền run_id), hệ thống ưu tiên hiển thị
+    trang bắt đầu mới (fresh start dashboard) kèm danh sách các lần chạy gần đây.
+    Nếu đang có một lần chạy đang hoạt động (active / in-flight) hoặc có `SENTINEL_DEMO_RUN`,
+    bảng điều khiển sẽ gắn với lần chạy đó để theo dõi trực tiếp.
     """
     demo_run = os.getenv("SENTINEL_DEMO_RUN") or None
-    record = _first_loadable_run(ctx, run_id or demo_run)
+    all_run_ids = list_runs(ctx.runs_dir)
 
-    if record is None:
+    recent_runs: list[dict[str, Any]] = []
+    active_run: RunRecord | None = None
+
+    for rid in all_run_ids[:MAX_RUNS_ON_HISTORY]:
+        try:
+            rec = load_run(ctx.runs_dir, rid)
+            m = collect_metrics(rec)
+            recent_runs.append({
+                "run_id": rid,
+                "state": rec.state.value,
+                "created_at": rec.created_at,
+                "findings": m["findings_total"],
+                "requests": m["requests_total"],
+                "elapsed_ms": m["total_elapsed_ms"],
+            })
+            if not rec.state.is_terminal() and active_run is None:
+                active_run = rec
+        except Exception:
+            continue
+
+    # Xác định lần chạy mục tiêu
+    target_record: RunRecord | None = None
+    if run_id:
+        target_record = _first_loadable_run(ctx, run_id)
+    elif demo_run:
+        target_record = _first_loadable_run(ctx, demo_run)
+    elif active_run:
+        target_record = active_run
+
+    if target_record is None:
         return {
             "run": None,
             "demo_run": demo_run,
-            "run_count": 0,
+            "run_count": len(all_run_ids),
+            "recent_runs": recent_runs,
             "pinned": False,
         }
 
-    data = run_data(ctx, record.run_id)
-    data.update(findings_data(ctx, record.run_id))
-    data.update(analysis_data(ctx, record.run_id))
-    data.update(events_data(ctx, record.run_id))
-    data.update(requests_data(ctx, record.run_id))
-    data["liveness"] = _run_liveness(record)
+    data = run_data(ctx, target_record.run_id)
+    data.update(findings_data(ctx, target_record.run_id))
+    data.update(analysis_data(ctx, target_record.run_id))
+    data.update(events_data(ctx, target_record.run_id))
+    data.update(requests_data(ctx, target_record.run_id))
+    data["liveness"] = _run_liveness(target_record)
     data["approval_request"] = _read_json(
-        record.root / "approval-request.json", None
+        target_record.root / "approval-request.json", None
     )
     data["demo_run"] = demo_run
-    data["pinned"] = bool(demo_run and demo_run == record.run_id)
-    data["run_count"] = len(list_runs(ctx.runs_dir))
+    data["pinned"] = bool(demo_run and demo_run == target_record.run_id)
+    data["run_count"] = len(all_run_ids)
+    data["recent_runs"] = recent_runs
     return data

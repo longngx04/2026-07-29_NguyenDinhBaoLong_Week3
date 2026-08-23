@@ -5,13 +5,67 @@
 
 {% if not run %}
 
-<div class="empty">
-  <p class="empty-title">Chưa có lần chạy nào.</p>
-  <p class="prose">
-    Bấm <strong>▶ Chạy quét</strong> ở thanh trên. Pipeline sẽ quét mã nguồn bằng
-    OpenGrep, quét ứng dụng đang chạy bằng ZAP qua Gateway, rồi để agent phân
-    loại kết quả. Toàn bộ chín bước hiện ngay trên trang này.
-  </p>
+<div class="empty" style="text-align: left; max-width: 900px; margin: 2rem auto; padding: 2.5rem; background: var(--bg-card, #131722); border-radius: 8px; border: 1px solid var(--border-color, #232936);">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 2rem;">
+    <div>
+      <p class="eyebrow" style="color: var(--signal, #38bdf8); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.4rem;">Trang bắt đầu</p>
+      <h1 style="font-size: 1.75rem; font-weight: 700; margin: 0 0 0.5rem 0; color: #f8fafc;">Bảng điều khiển Project Sentinel</h1>
+      <p class="prose" style="margin: 0; color: #94a3b8; font-size: 0.95rem; max-width: 600px;">
+        Pipeline phân tích an toàn 9 bước tự động: Quét SAST (OpenGrep) + DAST (ZAP) qua API Gateway &rarr; Chuẩn hoá 37 findings &rarr; LLM Triage với Kho tri thức hai tầng &rarr; Kiểm thử Safe Probe &rarr; Báo cáo cuối cùng.
+      </p>
+    </div>
+    <form method="post" action="/runs">
+      <button type="submit" class="btn btn-run" style="padding: 0.85rem 1.75rem; font-size: 1.05rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.25);">
+        ▶ Bắt đầu phân tích mới
+      </button>
+    </form>
+  </div>
+
+  {% if not recent_runs %}
+  <div style="padding: 1.5rem; background: rgba(255, 255, 255, 0.02); border-radius: 6px; border: 1px dashed var(--border-color, #232936);">
+    <p class="empty-title" style="margin-bottom: 0.5rem; font-size: 1.1rem; color: #cbd5e1;">Chưa có lần chạy nào trong hệ thống.</p>
+    <p class="prose" style="margin: 0; color: #64748b;">
+      Bấm nút <strong>▶ Bắt đầu phân tích mới</strong> ở trên để khởi động lần chạy đầu tiên. Toàn bộ tiến trình chín bước và nhật ký thực thi sẽ hiển thị trực tiếp theo thời gian thực.
+    </p>
+  </div>
+  {% else %}
+  <div style="margin-top: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <h2 style="font-size: 1.1rem; font-weight: 600; margin: 0; color: #e2e8f0;">Các lần chạy gần đây ({{ recent_runs|length }})</h2>
+      <a href="/history" style="color: var(--signal, #38bdf8); text-decoration: none; font-size: 0.88rem;">Xem toàn bộ lịch sử &rarr;</a>
+    </div>
+    <div class="table-wrap" style="overflow-x: auto; background: var(--bg-table, #0d111a); border-radius: 6px; border: 1px solid var(--border-color, #232936);">
+      <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--border-color, #232936); background: rgba(255, 255, 255, 0.02);">
+            <th style="padding: 0.75rem 1rem; color: #94a3b8; font-weight: 600;">Lần chạy (Run ID)</th>
+            <th style="padding: 0.75rem 1rem; color: #94a3b8; font-weight: 600;">Trạng thái</th>
+            <th style="padding: 0.75rem 1rem; color: #94a3b8; font-weight: 600;">Cảnh báo</th>
+            <th style="padding: 0.75rem 1rem; color: #94a3b8; font-weight: 600;">Thời gian chạy</th>
+            <th style="padding: 0.75rem 1rem; text-align: right; color: #94a3b8; font-weight: 600;">Hành động</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recent_runs %}
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+            <td style="padding: 0.75rem 1rem; font-family: monospace;">
+              <a href="/runs/{{ r.run_id }}" style="color: var(--signal, #38bdf8); text-decoration: none; font-weight: 600;">{{ r.run_id }}</a>
+            </td>
+            <td style="padding: 0.75rem 1rem;">
+              <span class="lamp" data-tone="{{ 'ok' if r.state == 'DONE' else ('bad' if r.state in ('FAILED', 'REJECTED') else 'live') }}" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">{{ r.state }}</span>
+            </td>
+            <td style="padding: 0.75rem 1rem; color: #cbd5e1;">{{ r.findings }}</td>
+            <td style="padding: 0.75rem 1rem; color: #94a3b8;">{{ (r.elapsed_ms / 1000)|round(1) }}s</td>
+            <td style="padding: 0.75rem 1rem; text-align: right;">
+              <a class="btn" href="/runs/{{ r.run_id }}" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; text-decoration: none;">Xem kết quả &rarr;</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 </div>
 
 {% else %}
@@ -21,6 +75,7 @@
 
 <div id="console"
      data-run-id="{{ run.run_id }}"
+     data-created-at="{{ run.created_at }}"
      data-terminal="{{ 'true' if run.state.is_terminal() else 'false' }}"
      data-stalled="{{ 'true' if liveness.stalled else 'false' }}"></div>
 

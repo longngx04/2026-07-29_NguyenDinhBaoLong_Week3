@@ -33,16 +33,16 @@ VALID_STATUSES = frozenset({"pending", "running", "done", "failed", "skipped"})
 #
 # Mỗi giá trị là bội số rộng của thời gian quan sát được, để mạng chậm hoặc
 # LLM phải thử lại không bị kết luận nhầm là treo.
-DEFAULT_STEP_BUDGET_S = 120
+DEFAULT_STEP_BUDGET_S = 30
 STEP_BUDGET_S: dict[str, int] = {
-    "scan": 900,      # dựng image + OpenGrep + ZAP spider và passive scan
-    "normalize": 120,
-    "analyze": 1200,  # gọi LLM theo nhóm, có thử lại
-    "propose": 120,
-    "probe": 180,
-    "scrub": 120,
-    "report": 120,
-    "finalize": 120,
+    "scan": 180,      # dựng image + OpenGrep + ZAP spider và passive scan (~3 phút)
+    "normalize": 30,
+    "analyze": 360,   # gọi LLM theo nhóm, có thử lại (~6 phút)
+    "propose": 30,
+    "probe": 30,
+    "scrub": 30,
+    "report": 30,
+    "finalize": 30,
 }
 # `approval` cố ý vắng mặt: chờ người vận hành bấm nút KHÔNG phải là treo, và
 # không có ngưỡng nào đúng cho việc một con người rời bàn đi pha cà phê.

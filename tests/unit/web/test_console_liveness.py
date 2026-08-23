@@ -61,30 +61,30 @@ def test_analyze_im_lang_bon_phut_van_khong_bi_coi_la_treo(client):
     treo giữa chừng, và cảnh báo treo lập tức thành thứ người xem học cách bỏ qua.
     """
     http, ctx = client
-    record = _run_stuck_at(ctx, "analyze", idle_seconds=260)
+    record = _run_stuck_at(ctx, "analyze", idle_seconds=200)
 
     data = _status(http, record.run_id)
     assert data["stalled"] is False
     assert data["running_step"] == "analyze"
-    assert data["stall_budget_s"] == 1200
+    assert data["stall_budget_s"] == 360
 
 
 def test_analyze_vuot_ngan_sach_thi_bi_bao_treo(client):
     http, ctx = client
-    record = _run_stuck_at(ctx, "analyze", idle_seconds=1300)
+    record = _run_stuck_at(ctx, "analyze", idle_seconds=400)
 
     data = _status(http, record.run_id)
     assert data["stalled"] is True
-    assert data["idle_seconds"] > 1200
+    assert data["idle_seconds"] > 360
 
 
 def test_moi_buoc_co_ngan_sach_rieng(client):
     """`normalize` xong trong phần mười giây; nó không được xài ngưỡng của LLM."""
     http, ctx = client
-    record = _run_stuck_at(ctx, "normalize", idle_seconds=260, state=RunState.NORMALIZING)
+    record = _run_stuck_at(ctx, "normalize", idle_seconds=40, state=RunState.NORMALIZING)
 
     data = _status(http, record.run_id)
-    assert data["stall_budget_s"] == 120
+    assert data["stall_budget_s"] == 30
     assert data["stalled"] is True
 
 
@@ -154,7 +154,7 @@ def test_bang_dieu_khien_danh_dau_san_trang_thai_treo_ngay_tu_may_chu(client):
     nhịp trước khi tự sửa, tức là nói dối một nhịp.
     """
     http, ctx = client
-    _run_stuck_at(ctx, "analyze", idle_seconds=1300)
+    _run_stuck_at(ctx, "analyze", idle_seconds=400)
 
     assert 'data-stalled="true"' in http.get("/").text
 

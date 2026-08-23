@@ -531,6 +531,14 @@ code {
   color: var(--paper-dim);
 }
 
+.station[data-status="done"] .wire::after,
+.station[data-status="done"] .node,
+.is-terminal .station .wire::after,
+.is-terminal .station .node {
+  animation: none !important;
+  opacity: 0;
+}
+
 .station[data-status="skipped"] .node {
   border-style: dashed;
   border-color: var(--paper-faint);
