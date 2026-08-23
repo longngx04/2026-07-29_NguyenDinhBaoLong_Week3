@@ -262,7 +262,10 @@ up:
 	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
 	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
 	if [ -z "$$KEY" ]; then KEY="$$(openssl rand -hex 32)"; export SENTINEL_GATEWAY_API_KEY="$$KEY"; fi; \
-	SENTINEL_GATEWAY_API_KEY="$$KEY" docker compose --profile target --profile app up --build --detach; \
+	DAST_KEY=$${SENTINEL_DAST_API_KEY:-$$(openssl rand -hex 32)}; \
+	ZAP_KEY=$${SENTINEL_ZAP_API_KEY:-$$(openssl rand -hex 32)}; \
+	SENTINEL_GATEWAY_API_KEY="$$KEY" SENTINEL_DAST_API_KEY="$$DAST_KEY" SENTINEL_ZAP_API_KEY="$$ZAP_KEY" \
+	docker compose --profile target --profile app --profile dast up --build --detach; \
 	for attempt in $$(seq 1 30); do \
 		code=$$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:9080/WebGoat/actuator/health || true); \
 		if test "$$code" = 401; then break; fi; \
@@ -273,4 +276,5 @@ up:
 	printf '  • Gateway: \033[1;34mhttp://127.0.0.1:9080\033[0m\n\n'
 
 down:
-	@SENTINEL_GATEWAY_API_KEY=dummy docker compose --profile target --profile app down
+	@SENTINEL_GATEWAY_API_KEY=dummy SENTINEL_DAST_API_KEY=dummy SENTINEL_ZAP_API_KEY=dummy \
+	docker compose --profile target --profile app --profile dast down

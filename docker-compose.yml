@@ -53,6 +53,8 @@ services:
     environment:
       - SENTINEL_GATEWAY_MODE=dast
       - SENTINEL_DAST_API_KEY=${SENTINEL_DAST_API_KEY:-}
+    volumes:
+      - sentinel-dast-log:/var/log/sentinel
     depends_on:
       webgoat:
         condition: service_healthy
@@ -72,11 +74,44 @@ services:
   zap:
     profiles: ["dast"]
     image: ghcr.io/zaproxy/zaproxy@sha256:8d387b1a63e3425beef4846e39719f5af2a787753af2d8b6558c6257d7a577a2
+    # Daemon chay suot vong doi stack. Container `web` khong co Docker nen no
+    # khong the `docker compose run zap`; no dieu khien daemon nay qua API.
+    # Dang DANH SACH, khong dung folded scalar `>`: chuoi mot dong bi tach nhap
+    # nhang khien ZAP bo qua `-port` va roi ve mot cong ngau nhien tren localhost.
+    command:
+      - zap.sh
+      - -daemon
+      - -host
+      - 0.0.0.0
+      - -port
+      - "8090"
+      - -config
+      - api.key=${SENTINEL_ZAP_API_KEY}
+      - -config
+      - api.addrs.addr.name=.*
+      - -config
+      - api.addrs.addr.regex=true
+    # `expose` chu KHONG `ports`: API cua ZAP dieu khien duoc mot trinh duyet
+    # tan cong, no khong duoc xuat hien tren bat ky giao dien host nao.
+    expose:
+      - "8090"
+    # Quan sat duoc: ZAP thinh thoang BO QUA `-port` va roi ve mot cong ngau nhien
+    # tren localhost (vd 127.0.0.1:33397). Khong co healthcheck thi container van
+    # bao "Up" con client thi cho het 300s roi bao loi mo ho. Healthcheck nay bat
+    # dung dieu can bat: API co that su nghe o 8090 khong.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf \"http://127.0.0.1:8090/JSON/core/view/version/?apikey=$$SENTINEL_ZAP_API_KEY\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     environment:
+      - SENTINEL_ZAP_API_KEY=${SENTINEL_ZAP_API_KEY:-}
       - ZAP_AUTH_HEADER=X-Sentinel-DAST-Key
       - ZAP_AUTH_HEADER_VALUE=${SENTINEL_DAST_API_KEY:-}
     volumes:
       - ./artifacts:/zap/wrk:rw
+      - ./infra/docker/zap:/zap/plans:ro
     depends_on:
       gateway-dast:
         condition: service_healthy
@@ -94,11 +129,23 @@ services:
       - SENTINEL_GATEWAY_API_KEY=${SENTINEL_GATEWAY_API_KEY:-}
       - LLM_API_KEY=${LLM_API_KEY:-}
       - SENTINEL_DEMO_RUN=${SENTINEL_DEMO_RUN:-}
+      # Web dieu khien ZAP qua API noi bo; no KHONG co Docker CLI va socket.
+      - SENTINEL_DAST_API_KEY=${SENTINEL_DAST_API_KEY:-}
+      - SENTINEL_ZAP_API_KEY=${SENTINEL_ZAP_API_KEY:-}
+      - SENTINEL_ZAP_URL=http://zap:8090
+      # Trong mang Docker, Gateway ten la `gateway`, khong phai 127.0.0.1.
+      - SENTINEL_GATEWAY_URL=http://gateway:8080
     volumes:
       - ./artifacts:/app/artifacts
+      # Chi doc: day la bang chung, tien trinh doc no khong duoc sua no.
+      - sentinel-dast-log:/var/log/sentinel:ro
       - ./benchmarks:/app/benchmarks:ro
     networks:
       - sentinel-net
+
+volumes:
+  # Bang chung cua lane DAST. gateway-dast ghi, web chi doc.
+  sentinel-dast-log:
 
 networks:
   sentinel-net:

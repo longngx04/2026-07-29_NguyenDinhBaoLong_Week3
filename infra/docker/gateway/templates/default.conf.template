@@ -199,6 +199,9 @@ server {
 server {
     listen 8081;
     access_log /dev/stdout sentinel_dast_access;
+    # Ghi ra CA HAI noi. stdout de `docker compose logs` van dung duoc khi go loi
+    # tren host; file de container `web` doc duoc bang chung ma khong can Docker.
+    access_log /var/log/sentinel/dast-access.log sentinel_dast_access;
     limit_req_status 429;
     # ZAP se gui body form. Nginx doc roi VUT no; WebGoat chi nhan body chinh
     # tac cua lane. 8k du cho form cua ZAP va xa duoi muc dang lo.
@@ -232,7 +235,13 @@ server {
     }
 
     location ^~ /WebGoat/ {
-        limit_req zone=sentinel_dast_rl burst=20 nodelay;
+        # burst=60 chu khong phai 20. Mot lan quet co hinh dang: spider bao nhieu
+        # GET roi requestor ban 11 POST lien tiep trong duoi mot giay. Voi burst=20,
+        # spider tieu het token va 10/11 POST bi 429 — do duoc o lan chay
+        # 20260823T110433Z, khien reachability tut tu 17 xuong 1.
+        # `rate` GIU NGUYEN 120r/m: tran ben vung — thu that su gioi han luu luong
+        # vao ung dung co lo hong — khong doi.
+        limit_req zone=sentinel_dast_rl burst=60 nodelay;
         proxy_set_header Cookie "JSESSIONID=${SENTINEL_DAST_SESSION}";
         proxy_set_body $sentinel_dast_post_body;
         proxy_set_header Content-Type "application/x-www-form-urlencoded";

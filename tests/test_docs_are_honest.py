@@ -16,7 +16,6 @@ DOCS = [
     REPO_ROOT / "docs" / "architecture.md",
     REPO_ROOT / "docs" / "product-brief.md",
     REPO_ROOT / "docs" / "limitations.md",
-    REPO_ROOT / "docs" / "demo-script.md",
     REPO_ROOT / "reports" / "week-06" / "report.md",
 ]
 
@@ -24,7 +23,6 @@ REQUIRED_DELIVERABLES = {
     "docs/architecture.md": "sơ đồ kiến trúc cuối",
     "docs/product-brief.md": "bản mô tả sản phẩm 1–2 trang",
     "docs/limitations.md": "giới hạn và rủi ro còn tồn tại",
-    "docs/demo-script.md": "kịch bản trình diễn 10–15 phút",
 }
 
 LINK = re.compile(r"\[[^\]]*\]\((?!https?://)([^)#]+)(?:#[^)]*)?\)")

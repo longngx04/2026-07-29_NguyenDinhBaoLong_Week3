@@ -1,0 +1,63 @@
+env:
+  contexts:
+    - name: sentinel-dast
+      urls:
+        - http://gateway-dast:8081/WebGoat/
+  parameters:
+    failOnError: true
+    progressToStdout: true
+
+jobs:
+  # 1. Spider: thay cho phan crawl cua zap-baseline.py
+  - type: spider
+    parameters:
+      context: sentinel-dast
+      url: http://gateway-dast:8081/WebGoat/login
+      maxDuration: 1
+
+  # 2. Requestor CHAY TRUOC passiveScan-wait, khac voi truoc day. Truoc day baseline
+  #    va requestor la hai tien trinh ZAP roi nhau, nen phan hoi cua cac request POST
+  #    khong he duoc passive scan. Dat o day thi chung duoc quet.
+  #    He qua: so alert co the TANG — day la thay doi hanh vi co chu y.
+  - type: requestor
+    parameters:
+      user: ""
+    requests:
+      - url: http://gateway-dast:8081/WebGoat/InsecureDeserialization/task
+        method: POST
+        data: "token="
+      - url: http://gateway-dast:8081/WebGoat/SqlInjection/assignment5a
+        method: POST
+        data: "account=&operator=&injection="
+      - url: http://gateway-dast:8081/WebGoat/SqlInjection/attack10
+        method: POST
+        data: "action_string="
+      - url: http://gateway-dast:8081/WebGoat/SqlInjection/attack2
+        method: POST
+        data: "query="
+      - url: http://gateway-dast:8081/WebGoat/SqlInjection/attack3
+        method: POST
+        data: "query="
+      - url: http://gateway-dast:8081/WebGoat/SqlInjection/attack4
+        method: POST
+        data: "query="
+      - url: http://gateway-dast:8081/WebGoat/SqlInjection/attack5
+        method: POST
+        data: "query="
+      - url: http://gateway-dast:8081/WebGoat/SqlInjection/attack8
+        method: POST
+        data: "name=&auth_tan="
+      - url: http://gateway-dast:8081/WebGoat/SqlInjection/attack9
+        method: POST
+        data: "name=&auth_tan="
+      - url: http://gateway-dast:8081/WebGoat/SqlInjectionAdvanced/attack6a
+        method: POST
+        data: "userid_6a="
+      - url: http://gateway-dast:8081/WebGoat/SqlInjectionAdvanced/attack6b
+        method: POST
+        data: "userid_6b="
+
+  # 3. Cho passive scan chay het hang doi
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5

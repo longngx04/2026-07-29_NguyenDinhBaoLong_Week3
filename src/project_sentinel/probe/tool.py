@@ -6,6 +6,8 @@ và để lại một dòng audit không chứa API key.
 
 from __future__ import annotations
 
+import os
+
 import json
 import uuid
 from dataclasses import dataclass
@@ -28,7 +30,10 @@ from project_sentinel.probe.proposal import SafeProbe
 from project_sentinel.probe.rate_limit import ToolRateLimiter
 from project_sentinel.probe.transport import BaseTransport, RealTransport
 
-GATEWAY_ORIGIN = "http://127.0.0.1:9080"
+# Mac dinh la dia chi tren host. Trong container `web`, `127.0.0.1:9080` la chinh
+# no — khong co gi lang nghe — nen Gateway phai duoc goi bang ten service tren mang
+# Docker. Khong ghi de duoc thi buoc probe khong bao gio chay duoc tu giao dien.
+GATEWAY_ORIGIN = os.getenv("SENTINEL_GATEWAY_URL", "http://127.0.0.1:9080")
 API_KEY_HEADER = "X-Sentinel-API-Key"
 # Gateway kiem lai template nay mot cach doc lap voi Python.
 TEMPLATE_HEADER = "X-Sentinel-Template"

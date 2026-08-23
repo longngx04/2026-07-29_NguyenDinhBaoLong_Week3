@@ -66,3 +66,29 @@ def test_dast_mode_fails_loudly_without_a_key():
     assert "SENTINEL_GATEWAY_MODE" in script
     assert "SENTINEL_DAST_API_KEY" in script
     assert "exit 1" in script
+
+
+def test_dast_lane_also_writes_its_log_to_a_file():
+    """`docker compose logs` can Docker. Container web khong co Docker, nen bang
+    chung phai nam o mot file doc duoc qua volume."""
+    server = _dast_server()
+    assert "access_log /dev/stdout sentinel_dast_access;" in server, (
+        "Giu dong stdout de `docker compose logs` van dung duoc khi go loi tren host"
+    )
+    assert "access_log /var/log/sentinel/dast-access.log sentinel_dast_access;" in server
+
+
+def test_dast_lane_burst_fits_one_whole_scan():
+    """Mot lan quet = spider (hang chuc GET) + requestor ban 11 POST lien tiep.
+    Voi burst=20, spider tieu het token va 10/11 POST bi 429 — do duoc o lan chay
+    20260823T110433Z, reachability tut tu 17 xuong 1.
+
+    `rate` phai GIU NGUYEN: do moi la tran ben vung gioi han luu luong vao ung dung
+    co lo hong. Chi noi burst de mot lan quet co hinh dang binh thuong di lot.
+    """
+    server = _dast_server()
+    assert "burst=60" in server
+    nginx = (REPO_ROOT / "infra/docker/gateway/nginx.conf").read_text(encoding="utf-8")
+    assert "zone=sentinel_dast_rl:10m rate=120r/m" in nginx, (
+        "Tran ben vung cua lane DAST khong duoc noi"
+    )

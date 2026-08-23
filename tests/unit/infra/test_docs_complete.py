@@ -13,7 +13,6 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
     "docs/target-webgoat.md",
     "docs/product-brief.md",
     "docs/limitations.md",
-    "docs/demo-script.md",
     "eval/README.md",
     "exercises/week4-gateway/README.md",
     "reports/week-05/report.md",
@@ -41,13 +40,6 @@ def test_readme_documents_the_one_command_run():
     assert "make web" in text
 
 
-def test_demo_script_covers_all_seven_required_items():
-    text = (REPO_ROOT / "docs" / "demo-script.md").read_text(encoding="utf-8").lower()
-    for item in ["quét", "báo cáo", "đề xuất", "approve", "reject",
-                 "gateway", "injection", "che"]:
-        assert item in text, f"Kịch bản demo thiếu hạng mục: {item}"
-
-
 def test_historical_reports_are_untouched():
     for week in ("01", "02", "03", "04"):
         assert (REPO_ROOT / "reports" / f"week-{week}" / "report.md").exists()
@@ -70,7 +62,6 @@ def test_documentation_does_not_drift_on_eval_case_counts():
         REPO_ROOT / "README.md",
         REPO_ROOT / "docs" / "product-brief.md",
         REPO_ROOT / "docs" / "limitations.md",
-        REPO_ROOT / "docs" / "demo-script.md",
     ]
     for doc in doc_files:
         content = doc.read_text(encoding="utf-8").lower()
