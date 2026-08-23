@@ -1,344 +1,389 @@
 # Project Sentinel
 
-AI-assisted SAST/DAST finding normalization, knowledge retrieval, and security analysis pipeline
-evaluated on [OWASP WebGoat](https://owasp.org/www-project-webgoat/). Every request the agent
-proposes is constrained by an allowlist, a human approval gate, and an independent API Gateway;
-sensitive data is redacted before it reaches an external model or disk. The optional ZAP baseline
-scan also reaches WebGoat only through a separate, internal-only Gateway lane.
+An AI-assisted security triage pipeline for web applications. It runs SAST and DAST against
+[OWASP WebGoat](https://owasp.org/www-project-webgoat/), normalises both into one finding
+format, has an LLM agent explain and prioritise them against a curated knowledge base, and
+lets that agent propose one verification request — which a human must approve before it is
+sent through an API Gateway that independently re-checks it.
+
+**The point is not that an LLM is involved. The point is that the LLM's output is treated as
+untrusted data and clamped by deterministic checks.** Four layers reject a model response
+that invents a finding ID, alters a source excerpt, writes an exploit payload, or claims
+more than its evidence supports.
 
 ---
 
-## Luồng chín bước
+## Table of contents
 
-Chạy bằng **một câu lệnh** (`make run` hoặc giao diện `make web`). Luồng dừng ở giữa để chờ người phê duyệt.
+- [How it works](#how-it-works)
+- [Quick start](#quick-start)
+- [Verifying it works](#verifying-it-works)
+- [Results from a real run](#results-from-a-real-run)
+- [Security model](#security-model)
+- [Command reference](#command-reference)
+- [Knowledge base](#knowledge-base)
+- [Known limitations](#known-limitations)
+- [Repository layout](#repository-layout)
+
+---
+
+## How it works
+
+Nine steps, one command, one mandatory stop for a human.
 
 ```mermaid
 flowchart TD
-    A[1. Quét SAST + DAST] --> B[2. Chuẩn hoá & Đối chiếu]
-    B --> C[3. Agent phân tích + kho tri thức]
-    C --> D[4. Agent đề xuất probe]
-    D --> E{Trong allowlist?}
-    E -- không --> X[Chặn + ghi sự kiện]
-    E -- có --> F[5. Người dùng duyệt]
-    F -- Reject --> Y[Dừng, không gửi gì]
-    F -- Approve --> G[6. Request qua Gateway]
-    G --> H[7. Lọc injection + che PII]
-    H --> I[8. Cập nhật báo cáo]
-    I --> J[9. Ghi log + số liệu]
+    A[1. Scan — OpenGrep SAST + ZAP DAST] --> B[2. Normalise and correlate]
+    B --> C[3. Agent analysis + knowledge base]
+    C --> D[4. Agent proposes a probe]
+    D --> E{In the allowlist?}
+    E -- no --> X[Blocked, event logged]
+    E -- yes --> F[5. Human approves]
+    F -- reject --> Y[Stop, nothing is sent]
+    F -- approve --> G[6. Request via API Gateway]
+    G --> H[7. Scan for injection, redact PII]
+    H --> I[8. Update the report]
+    I --> J[9. Write logs and metrics]
 ```
 
-```text
-   GIAI ĐOẠN 1 — không có gì rời khỏi hệ thống
-   ┌──────────────────────────────────────────────────────────────┐
-   │  1 scan       SAST (OpenGrep) + DAST (ZAP)  → raw.json        │
-   │  2 normalize  chuẩn hoá & đối chiếu runtime → findings.json   │
-   │  3 analyze    Agent + kho tri thức          → analysis.jsonl  │
-   │  4 propose    Agent đề xuất request         → proposal.json   │
-   └──────────────────────────────┬───────────────────────────────┘
-
-                       ┌──────────▼──────────┐
-                       │  5  CỔNG PHÊ DUYỆT  │  ◄── luồng DỪNG ở đây
-                       │  mặc định = TỪ CHỐI │      ràng buộc bằng dấu vân tay
-                       └──────────┬──────────┘
-   GIAI ĐOẠN 2 — có traffic thật │
-   ┌──────────────────────────────▼───────────────────────────────┐
-   │  6 probe      GET/POST qua Gateway          → probe-result    │
-   │  7 scrub      quét injection rồi che PII    → scrubbed.json   │
-   │  8 report     dựng báo cáo cho người đọc    → report.md/json  │
-   │  9 finalize   chốt số liệu, trạng thái cuối → metrics.json    │
-   └──────────────────────────────────────────────────────────────┘
-```
-
-Bốn chốt guardrail nằm cắt ngang luồng đó. Mỗi chốt được đặt ở nơi **mọi** đường mã đều
-buộc phải chạm, nên không caller nào quên gọi được:
-
-```text
-build_llm()        ──> RedactingProvider     # không gì tới mô hình ngoài mà chưa che
-log_request()      ──> redact_structure()    # không gì chạm đĩa mà chưa che
-send_probe()       ──> requires_approval()   # POST hoặc payload đặc biệt cần người duyệt
-send_probe()       ──> redact() tại cửa ra   # response được che trước khi rời hàm
-```
-
-Nội dung lấy từ ứng dụng đích là **dữ liệu không đáng tin**: nó bị quét tìm mẫu injection,
-cắt bỏ chỉ dẫn, che dữ liệu nhạy cảm, rồi bọc trong thẻ `<untrusted_app_response>` trước
-khi bất kỳ mô hình nào nhìn thấy.
-
-Chi tiết ranh giới tin cậy, vòng đời state và ba lớp chống bịa đặt:
-**[docs/architecture.md](docs/architecture.md)**.
-
-Tài liệu target: [docs/target-webgoat.md](docs/target-webgoat.md)
+Steps 1–4 send nothing outbound except to the LLM, and everything reaching the LLM is
+redacted first. Step 5 defaults to **reject**: anything other than typing `approve` stops
+the run. Only steps 6–9 produce real traffic, and it goes through the Gateway, never
+directly to the target.
 
 ---
 
-## Repository Structure
+## Quick start
 
-```text
-project-sentinel/
-├── src/project_sentinel/         # Production Python code
-│   ├── ingestion/ retrieval/     #   SAST normalization and knowledge search
-│   ├── analysis/ llm/            #   Analysis pipeline and LLM providers
-│   ├── guardrails/               #   Redaction, injection defence, approval, event log
-│   ├── gateway/ probe/           #   Allowlist, audit log, and the only request path out
-│   ├── orchestrator/steps/       #   Chín bước của luồng, một file mỗi giai đoạn
-│   ├── commands/                 #   Một file cho mỗi lệnh con CLI
-│   └── demo/                     #   Runnable guardrails demo scenario
-├── tests/                        # Unit, integration tests, and fixtures
-├── eval/                         # Bộ 12 ca đánh giá + ground truth 23 finding WebGoat + bộ chấm
-├── docs/                         # Kiến trúc, mô tả sản phẩm, giới hạn, kịch bản demo
-├── data/knowledge-base/          # KB hai tầng: tier1/ loại lỗ hổng, tier2/ họ sink
-├── configs/                      # Prompts, OpenGrep rules, gateway allowlist
-├── schemas/                      # JSON Schema definitions
-├── artifacts/runs/<run-id>/      # Output runtime của từng lần chạy (Git ignore)
-├── reports/                      # Báo cáo theo tuần + evidence pack đã lọc
-├── worklog/                      # Báo cáo của agent sau mỗi task
-├── benchmarks/targets/webgoat/   # WebGoat benchmark (Git submodule)
-└── infra/docker/                 # Scanner image and Nginx API Gateway build context
-```
+### Prerequisites
 
----
+| Requirement | Notes |
+| :--- | :--- |
+| Python 3.10+ | CI uses 3.12 |
+| Docker Engine + Compose v2 | Runs WebGoat, both Gateway lanes, ZAP, and the web UI |
+| `git`, `curl`, `jq`, `openssl` | Available on the host |
+| An LLM API key | OpenRouter by default; needed only for the analysis step |
+| Outbound network | First container build, and live LLM calls |
 
-## Quick Start
-
-Prerequisites:
-
-- Python 3.10 or newer (CI uses Python 3.12).
-- Docker Engine with Docker Compose v2.
-- Git, `curl`, `jq`, and `openssl` available on the host.
-- Outbound network access for the first container build and live LLM tests.
+### 1. Clone and install
 
 ```bash
-# Clone with submodules (if downloading fresh)
-git submodule update --init --recursive
+git clone --recurse-submodules <repository-url>
+cd project-sentinel
 
-# Create an isolated environment and install the locked grader dependencies.
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+```
 
-# Generate an ephemeral Gateway credential for this shell. It is never printed
-# or written to Git; repeat this export in a new shell when needed.
-export SENTINEL_GATEWAY_API_KEY="$(openssl rand -hex 32)"
+`requirements.txt` is the locked, pip-compatible export of `uv.lock` and installs this
+repository in editable mode. If you cloned without `--recurse-submodules`, run
+`git submodule update --init --recursive` — WebGoat's source is the SAST target.
 
-# Run the non-LLM test suite against the real Gateway and WebGoat.
-# the target containers are started automatically and left running for debugging.
-make agent-test
+### 2. Configure
 
-# Run the full pipeline via CLI
-make run
+```bash
+cp .env.example .env
+# Edit .env and set LLM_API_KEY. Everything else has a working default.
+```
 
-# Or launch the interactive Web UI
-make web
+`.env` is gitignored, and its contents are redacted before reaching any report or log.
 
-# Full stack in Docker: WebGoat, Gateway (probe + DAST lanes), ZAP daemon, web UI.
-# Bấm quét từ giao diện chạy CẢ SAST lẫn DAST — container web điều khiển ZAP qua API
-# nội bộ, nó không có Docker CLI và không có docker socket.
+### 3. Start the system
+
+```bash
 make up
 ```
 
----
+This builds and starts five containers: WebGoat, the Gateway probe lane, the Gateway DAST
+lane, the ZAP daemon, and the web UI. Gateway credentials are generated fresh with
+`openssl rand -hex 32` on every `make up` — never written to Git, never printed.
 
-## Chạy luồng chín bước
+- Web UI: <http://127.0.0.1:8000>
+- Gateway: <http://127.0.0.1:9080> — returns `401` without a key, which is correct
 
-Đây là đường chính của sản phẩm. Mọi thứ khác trong README là công cụ hỗ trợ.
+### 4. Run the pipeline
 
 ```bash
-# Chuẩn bị (một lần)
-cp .env.example .env                                    # điền LLM_API_KEY
-export SENTINEL_GATEWAY_API_KEY="$(openssl rand -hex 32)"
-make target-up                                          # Gateway + WebGoat
+make run
+```
 
-# Chạy đầu-cuối. Luồng DỪNG ở cổng phê duyệt và hỏi bạn.
-python -m project_sentinel.cli run
-#   → gõ 'approve' để đồng ý
-#   → gõ bất cứ thứ gì khác để TỪ CHỐI (mặc định an toàn)
+The run stops at the approval gate and asks you. Type `approve` to allow the request, or
+anything else to reject it. Expect roughly **6 minutes**; the analysis step is about 97 % of
+that, because it makes around 40 LLM calls.
 
-# Xem lại các lần chạy
-python -m project_sentinel.cli runs
+When it finishes, read `artifacts/runs/<run-id>/report.md`.
 
-# Duyệt một lần chạy đang chờ, từ một terminal khác
+### 5. Shut down
+
+```bash
+make down
+```
+
+---
+
+## Verifying it works
+
+Run these in order on a fresh clone. Everything except `make eval` works without an LLM key.
+
+```bash
+make quality        # ruff + mypy + tests + coverage gate + dependency audit
+make agent-test     # tests against the real Gateway and WebGoat containers
+make eval           # 13-case agent evaluation, needs LLM_API_KEY
+```
+
+Expected on the reference environment:
+
+| Command | Expected result | Time |
+| :--- | :--- | ---: |
+| `make quality` | **1051 passed**, coverage **83.8 %** against a 78 % gate, no known vulnerabilities | ~40 s |
+| `make agent-test` | all green, including real Gateway policy enforcement | ~35 s |
+| `make eval` | **13/13 cases**, 39/39 samples across 3 repeats | ~5 min |
+
+If `make quality` is green, the code is sound. If `make agent-test` is green, the Gateway is
+enforcing its policy for real rather than in a mock.
+
+---
+
+## Results from a real run
+
+Every figure below comes from run `20260823T111417Z` — a complete nine-step run in Docker,
+with a real LLM and a human typing `approve`. Reproduce with `make up && make run`, then
+compare against `artifacts/runs/<run-id>/metrics.json`.
+
+| Measure | Value |
+| :--- | ---: |
+| Raw findings | **37** — 23 SAST + 14 DAST |
+| Analysis records produced | **34 of 37** finding groups |
+| SAST findings proven reachable through the Gateway | **17 of 23** |
+| Requests sent through the Gateway | **1**, denied **0** |
+| Approved by | `cli-operator` — a human |
+| LLM / application errors | **0 / 0** |
+| Total wall time | **355 s** |
+
+Two numbers deserve emphasis, both unflattering.
+
+**Recall is 18.7 %.** The scanner reaches 14 of the 75 known vulnerabilities in WebGoat,
+because the rule set contains only three rules. High precision on top of low recall only
+means *"what it happens to find, it reads reasonably well."* **Do not treat "nothing found"
+as evidence that code is clean.**
+
+**Three of 37 finding groups produced no record.** The model returned output that failed
+schema or provenance validation, and after one retry the group was dropped — those findings
+are absent from the final report. The run is marked `PARTIAL`, not `COMPLETE`, and the
+reasons are recorded in `analysis-summary.json`.
+
+Full analysis, including per-dimension agent accuracy and the ground-truth comparison:
+[`reports/week-06/report.md`](reports/week-06/report.md).
+
+---
+
+## Security model
+
+### The target is deliberately vulnerable
+
+WebGoat contains real, exploitable vulnerabilities. It runs on an internal Docker network
+and **is never published to a host port**. Only the Gateway's probe lane binds a host port,
+and only to loopback. Thirteen tests lock this; changing the compose networking to expose
+WebGoat on `0.0.0.0` fails the suite.
+
+### Two independent Gateway lanes
+
+| Lane | Address | Used by | Policy |
+| :--- | :--- | :--- | :--- |
+| Probe | `127.0.0.1:9080` | The agent's approved verification request | Exact template match — one endpoint, one payload shape |
+| DAST | internal only | The ZAP scanner | Broader crawl, but request bodies are replaced with Gateway-chosen constants |
+
+Both lanes are deny-by-default. The allowlist exists in **two independently written layers**:
+a JSON file the Python side reads, and nginx `map` directives the Gateway reads. Neither is
+generated from the other, so a mistake in one cannot silently propagate to the other.
+
+### Four guardrail chokepoints
+
+Each sits where every code path must pass, so no caller can forget it:
+
+```text
+build_llm()   ──> RedactingProvider    # nothing reaches an external model unredacted
+log_request() ──> redact_structure()   # nothing reaches disk unredacted
+send_probe()  ──> requires_approval()  # POST or unusual payload needs a human
+send_probe()  ──> redact() on the way out
+```
+
+### Application output is untrusted by default
+
+Anything the target returns is scanned for injection patterns, stripped of embedded
+instructions, redacted, and wrapped in `<untrusted_app_response>` tags before any model
+sees it.
+
+### Four layers that reject bad model output
+
+| Layer | Rejects |
+| :--- | :--- |
+| JSON Schema | Structurally invalid responses |
+| Provenance | Invented finding IDs, locations, CWEs, or altered source excerpts |
+| Output safety | Exploit payloads inside remediation advice |
+| Calibration | Conclusions stronger than the evidence supports |
+
+Because `attacker_control` has no independent measurement, the calibration layer forces it to
+`not_proven`, which caps every finding at `medium`. The system deliberately **cannot emit
+`high` or `critical`**. This is an honest-labelling trade-off with a real cost: findings can
+no longer be prioritised by severity.
+
+---
+
+## Command reference
+
+### Running the system
+
+```bash
+make up            # build and start the full stack in Docker
+make run           # nine-step pipeline, stops at the approval gate
+make runs          # list previous runs and their state
+make down          # stop everything
+make clean-runs    # keep the 5 most recent runs, delete older artifacts (KEEP=10 to keep more)
+make web           # web UI directly on the host with auto-reload, for development
+```
+
+`make web` and `make up` both serve the UI on port 8000 — use one or the other, not both.
+
+### Approving from a second terminal
+
+```bash
 python -m project_sentinel.cli approve <run-id> --decision approve
 python -m project_sentinel.cli approve <run-id> --decision reject
-
-# Không có người trực (CI). KHÔNG giả làm người: metrics ghi decided_by=cli-auto
-# và báo cáo in một dòng cảnh báo.
-python -m project_sentinel.cli run --yes
-
-# Dọn dẹp — giữ 5 lần chạy gần nhất
-make clean-runs                    # KEEP=10 để giữ nhiều hơn
-make target-down
 ```
 
-Bước `analyze` mất khoảng **6 phút** (đo thực tế khoảng 360–370 s với ~41–44 lời gọi LLM
-cho 37 nhóm, giá trị dao động tùy lần chạy). Đừng chạy trực tiếp khi đang trình diễn.
+For unattended CI, `make run` accepts `--yes`. It does **not** pretend a human decided:
+metrics record `decided_by: cli-auto` and the report prints a warning line.
 
-### Bảy lệnh con
+### The seven CLI subcommands
 
-| Lệnh | Việc |
+Every `make` target above wraps one of these. Add `--help` to any of them for full options.
+
+| Command | What it does |
 | :--- | :--- |
-| `python -m project_sentinel.cli run` | Chạy chín bước đầu-cuối, dừng ở cổng phê duyệt |
-| `python -m project_sentinel.cli runs` | Liệt kê các lần chạy và trạng thái của chúng |
-| `python -m project_sentinel.cli approve <run-id> --decision approve\|reject` | Quyết định rồi chạy tiếp một lần chạy đang chờ |
-| `python -m project_sentinel.cli analyze --input … --output …` | Chỉ chạy bước phân tích trên một file findings |
-| `python -m project_sentinel.cli validate --input …` | Đối chiếu một `analysis.jsonl` với JSON Schema |
-| `python -m project_sentinel.cli probe --method GET --path …` | Gửi một request thủ công qua Gateway để kiểm tra hạ tầng |
-| `python -m project_sentinel.cli demo` | Chạy kịch bản trình diễn guardrails |
+| `python -m project_sentinel.cli run` | Run all nine steps, stopping at the approval gate |
+| `python -m project_sentinel.cli runs` | List previous runs and their state |
+| `python -m project_sentinel.cli approve <run-id> --decision approve\|reject` | Decide a waiting run, then continue it |
+| `python -m project_sentinel.cli analyze --input … --output …` | Run only the analysis step on a findings file |
+| `python -m project_sentinel.cli validate --input …` | Check an `analysis.jsonl` against the JSON Schema |
+| `python -m project_sentinel.cli probe --method GET --path …` | Send one manual request through the Gateway |
+| `python -m project_sentinel.cli demo` | Run the guardrail demonstration scenario |
 
-Thêm `--help` sau bất kỳ lệnh nào để xem tham số đầy đủ.
+### Individual stages
 
-### Artifact của một lần chạy
+```bash
+make scan                       # OpenGrep only
+make dast                       # ZAP baseline through the internal DAST lane
+make normalize                  # normalise raw scanner output
+make search Q='SQL Injection'   # query the knowledge base
+make probe                      # send one safe request through the Gateway
+make guardrails-demo            # interactive guardrail demonstration
+```
 
-Mỗi lần chạy ghi vào `artifacts/runs/<run-id>/`. Thư mục này **bị Git ignore** vì nó là
-output runtime. Bộ đã lọc dùng để chấm nằm trong
+### Testing and measurement
+
+```bash
+make quality                    # lint, types, tests, coverage, dependency audit
+make agent-test                 # tests against real containers
+make eval                       # agent evaluation, 13 cases, 3 repeats
+make kb-coverage                # knowledge base coverage against known vulnerabilities
+make kb-links                   # verify every reference URL still resolves, needs network
+make score-ground-truth ANALYSIS=artifacts/runs/<id>/analysis.jsonl
+```
+
+---
+
+## Knowledge base
+
+Two tiers, deliberately separated.
+
+| Tier | Documents | Answers |
+| :--- | ---: | :--- |
+| Tier 1 | 17 | What is this class of vulnerability? |
+| Tier 2 | 17 | When is this specific API or header dangerous — and when is it **not**? |
+
+Tier 2 entries are retrieved by **deterministic lookup**, keyed on the scanner rule ID first
+and the CWE second, falling back to keyword search over Tier 1 only when neither matches.
+When a Tier 2 document is matched by rule ID, the agent is **required** to cite it and to use
+its canonical category as the finding title; failing to do so is a provenance error.
+
+The `not_exploitable_when` field on each Tier 2 entry is what lets the agent conclude
+`false_positive` with grounds instead of escalating everything.
+
+Run `make kb-coverage` to see which declared sinks still have no matching scanner rule. That
+list is the roadmap for improving recall.
+
+---
+
+## Known limitations
+
+Read [`docs/limitations.md`](docs/limitations.md) before trusting any number this system
+produces. The four that matter most:
+
+1. **Recall is 18.7 %.** Three SAST rules is the ceiling on everything else.
+2. **No `high` or `critical` severity is ever emitted**, because `attacker_control` is
+   clamped. Severity-based prioritisation is unavailable.
+3. **Runs can be `PARTIAL`.** Finding groups whose model output fails validation are dropped,
+   and the affected findings never reach the report.
+4. **LLM output varies between runs.** Every figure here is one sample, not a constant.
+   `make eval` repeats three times and takes the majority for exactly this reason.
+
+---
+
+## Repository layout
+
+```text
+project-sentinel/
+├── src/project_sentinel/
+│   ├── ingestion/ retrieval/   # normalisation and knowledge search
+│   ├── analysis/ llm/          # analysis pipeline, validators, calibration
+│   ├── guardrails/             # redaction, injection defence, approval, events
+│   ├── gateway/ probe/ dast/   # allowlist, audit log, the only outbound paths
+│   ├── orchestrator/steps/     # the nine steps, one file per stage
+│   ├── commands/ web/          # CLI subcommands and the read-only web UI
+│   └── demo/                   # runnable guardrail demonstration
+├── configs/                    # prompts, OpenGrep rules, Gateway allowlists
+├── data/knowledge-base/        # tier1/ and tier2/ security knowledge
+├── eval/                       # 13 evaluation cases + WebGoat ground truth
+├── infra/docker/               # scanner, Gateway, ZAP, and web images
+├── schemas/                    # JSON Schema for analysis records
+├── tests/                      # unit, integration, and infrastructure tests
+├── reports/                    # weekly reports; week 6 is the final one
+├── docs/                       # architecture, limitations, product brief
+└── artifacts/runs/<run-id>/    # per-run output, gitignored
+```
+
+### What to read first
+
+| You are | Start here |
+| :--- | :--- |
+| Grading this project | [`reports/week-06/report.md`](reports/week-06/report.md) |
+| Deciding whether to use it | [`docs/product-brief.md`](docs/product-brief.md) |
+| Reviewing the security design | [`docs/architecture.md`](docs/architecture.md) |
+| About to trust a number | [`docs/limitations.md`](docs/limitations.md) |
+
+### Per-run artifacts
+
+Each run writes to `artifacts/runs/<run-id>/`, gitignored because it is runtime output. A
+filtered evidence pack is committed at
 [`reports/week-06/artifacts/`](reports/week-06/artifacts/).
 
-Đọc gì trước: `report.md` (cho người) · `metrics.json` (năm nhóm số liệu) ·
-`events.jsonl` (sự kiện guardrail) · `state.json` (tiến độ chín bước).
-Danh sách đầy đủ: [docs/architecture.md](docs/architecture.md) §6.
-
-### Đo chất lượng Agent
-
-```bash
-make eval                          # 12 ca đánh giá tự viết, cần LLM_API_KEY
-make eval REPEAT=3                 # chạy ba lần, báo phân bố thay vì một mẫu
-
-# Chấm trên 23 cảnh báo WebGoat THẬT, đối chiếu nhãn người review
-make score-ground-truth ANALYSIS=artifacts/runs/<run-id>/analysis.jsonl
-make kb-coverage                   # KB Tier 2 phủ tới đâu so với lỗ hổng có thật
-```
-
-Ba bộ đo ba thứ khác nhau:
-
-| Bộ | Trả lời câu | Chỉ số |
-| :--- | :--- | :--- |
-| `eval/cases/` (12 ca tự viết) | Agent có chạy đúng trên input mẫu không? | smoke test |
-| `eval/ground-truth/webgoat-findings.json` (23 mục) | Cái được báo có thật không? | **precision** |
-| `eval/ground-truth/recall/` (75 mục) | Cái có thật có được tìm ra không? | **recall** |
-
-`make score-ground-truth` chấm cả precision lẫn recall trong một lần nếu thư mục lần chạy
-có `findings.json`.
-
-> **Con số cần nhìn trước:** recall hiện là **18,7 %** — hệ thống chỉ thấy 14/75 lỗ hổng
-> có thật trong WebGoat, vì bộ rule scanner chỉ có ba rule. Đừng dùng kết quả "không tìm
-> thấy gì" như bằng chứng rằng mã nguồn đã sạch.
-
-Kết quả và cách đọc: [reports/week-06/report.md](reports/week-06/report.md) §4.4 và §4.5.
-Bộ nhãn recall lấy từ nguồn ngoài — nguồn gốc và bản quyền:
-[eval/ground-truth/recall/PROVENANCE.md](eval/ground-truth/recall/PROVENANCE.md).
-
-### Kiểm tra chất lượng mã
-
-```bash
-make quality        # ruff + mypy + coverage (ngưỡng 78 %) + dependency audit
-make lint           # riêng ruff
-make typecheck      # riêng mypy
-make kb-links       # kiểm URL trích dẫn trong KB còn sống không (cần mạng)
-```
-
-CI chạy đúng bộ lệnh này trong job `quality-gates`.
+Read in this order: `report.md` for people, `metrics.json` for the five metric groups,
+`events.jsonl` for guardrail events, `state.json` for nine-step progress.
 
 ---
 
-## Common Commands
+## Continuous integration
 
-```bash
-# Run OpenGrep in its isolated scanner stack (no Gateway API key required)
-make scan
-
-# Normalize raw OpenGrep output
-make normalize
-
-# Run an unauthenticated ZAP baseline spider + passive scan through the internal
-# DAST Gateway, then normalize and merge SAST/DAST findings.
-make dast
-make scan-all
-
-# Search security knowledge base
-make search Q='SQL Injection'
-
-# Real OpenRouter analysis run. Read the key without echoing it or storing it in
-# shell history; alternatively put it in an untracked .env copied from .env.example.
-read -rsp 'OpenRouter API key: ' LLM_API_KEY && export LLM_API_KEY && printf '\n'
-make analyze
-make validate-analysis
-
-# API Gateway & Safe Verification Probe
-export SENTINEL_GATEWAY_API_KEY="${SENTINEL_GATEWAY_API_KEY:-$(openssl rand -hex 32)}"
-make target-up        # start Gateway & WebGoat containers with health check
-make probe            # run safe probe request through Gateway
-make gateway-demo
-make gateway-test      # focused gateway + probe tests
-make gateway-live-test # real Docker Gateway + WebGoat acceptance test
-make dast-test         # one real ZAP baseline scan + Gateway-path evidence test
-make llm-test          # real OpenRouter tests, sequential by default for reliability
-make target-down
-
-# Guardrails
-make guardrails-test              # guardrail unit tests + the six mandatory acceptance cases
-make guardrails-demo              # interactive demo: you approve or reject each risky request
-make guardrails-demo ARGS=--auto  # same scenario, unattended, for CI or capturing a log
-```
-
-`make guardrails-demo` walks seven steps and prints a pass/fail verdict for each: prompt
-injection in an application response, a forged closing tag, redaction on the way to the LLM,
-redaction on the way to disk, a rejected request, and an approved one. It requires the real
-Gateway; the proof that a rejected request sends nothing is that the Nginx access log gains
-no line, which is evidence at the infrastructure boundary rather than a call count inside
-Python.
-
-ZAP never receives a direct WebGoat address. `make dast` creates an ephemeral DAST credential,
-runs the baseline spider/passive scanner against `http://gateway-dast:8081/WebGoat/login`, and
-stores `artifacts/raw/zap.json`, `artifacts/normalized/zap-findings.json`, and the redacted
-Gateway evidence at `artifacts/dast/gateway-access.log`. The DAST listener is Docker-internal,
-permits only `GET`/`HEAD` below `/WebGoat/`, strips caller-controlled
-headers and request bodies, and is independent from the stricter Agent probe listener. This is
-deliberately **not** a ZAP active scan.
-
-`requirements.txt` is the locked, pip-compatible grader entry point exported from `uv.lock`; it
-installs this repository in editable mode. After an intentional dependency change in
-`pyproject.toml`, regenerate both files with:
-
-```bash
-uv lock
-uv export --locked --extra dev --no-hashes --output-file requirements.txt
-```
-
-`make llm-test` bounds grader runs to one pytest worker, one finding-group request at a time, and a
-60-second absolute provider deadline with no transport retry. Production runs keep the runtime values from
-`.env`; the live suite retains one schema-validation retry for malformed model output.
+`.github/workflows/security-scan.yml` runs three jobs: quality gates (lint, types, tests,
+coverage, dependency audit, and Bandit against this project's own source); a scan-and-test
+job that starts real Gateway and WebGoat containers; and a nightly job that exercises the
+live LLM path.
 
 ---
 
-## Tài liệu
-
-Kho tri thức có hai tầng. `tier1/` trả lời *loại lỗ hổng này là gì*; `tier2/` trả lời
-*API cụ thể này nguy hiểm khi nào và **không** nguy hiểm khi nào*. Tầng hai được tra
-bằng khoá tất định (`rule_id`, rồi `cwe`), và khi tra được thì agent buộc phải trích
-dẫn — đây là ràng buộc Python kiểm, không phải lời khuyên trong prompt.
-
-| Tài liệu | Dành cho ai |
-| :--- | :--- |
-| [docs/architecture.md](docs/architecture.md) | Người cần hiểu ranh giới tin cậy và vòng đời state |
-| [docs/product-brief.md](docs/product-brief.md) | Người quyết định có nên dùng sản phẩm này không |
-| [docs/limitations.md](docs/limitations.md) | **Đọc trước khi tin bất kỳ con số nào** |
-| [docs/target-webgoat.md](docs/target-webgoat.md) | Người cần biết về ứng dụng đích |
-
----
-
-## Historical Sprint Reports
-
-- [Week 1 Report — OpenGrep SAST Setup](reports/week-01/report.md)
-- [Week 2 Report — Finding Normalization & Knowledge Retrieval](reports/week-02/report.md)
-- [Week 3 Report — Security Analysis Agent & Provenance Guardrails](reports/week-03/report.md)
-- [Week 4 Report — API Gateway & Safe Test Request Tool](reports/week-04/report.md)
-- [Week 5 Report — Guardrails, Human-in-the-Loop & Redaction](reports/week-05/report.md)
-- [Week 6 Report — Tích hợp, đánh giá và bàn giao](reports/week-06/report.md)
-  · [evidence pack](reports/week-06/artifacts/)
-
----
-
-## Security Invariants & Target Binding
-
-> **SECURITY NOTE**: OWASP WebGoat is an intentionally vulnerable benchmark application.
-> The `docker-compose.yml` configuration strictly binds Nginx Gateway to loopback (`127.0.0.1:9080:8080`). WebGoat container port 8080 is internal only and not exposed on host interfaces.
-> Do not modify container networking to expose WebGoat or Gateway on public network interfaces (`0.0.0.0`).
+> **Security note.** OWASP WebGoat is intentionally vulnerable software. `docker-compose.yml`
+> keeps it on an internal network with no host port and binds the Gateway to loopback only.
+> Do not modify the container networking to expose either on a public interface.
