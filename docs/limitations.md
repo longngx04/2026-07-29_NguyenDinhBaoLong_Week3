@@ -62,6 +62,14 @@ xuôi thì không có cách xác minh tự động.
   hổng đã được chứng minh. Python kẹp cứng `attacker_control` về `not_proven` vì chưa
   có phép đo độc lập, nên `confirmed` không thể phát ra được (đây là hàng rào kẹp chặt
   ở tầng Python, không phải giới hạn tự nhiên).
+- **Hệ thống không còn phát ra được `high` hay `critical`.** Vì `attacker_control`
+  chưa có phép đo độc lập, Python kẹp nó về `not_proven`, và luật trần severity kéo
+  mọi kết luận xuống tối đa `medium`. Đối chiếu với bộ nhãn người review, độ chính
+  xác severity vì thế giảm từ 71,4% xuống 28,6%. Hậu quả thực tế: **không thể xếp ưu
+  tiên các phát hiện theo mức nghiêm trọng nữa** — mọi thứ đều là `medium`. Đây là
+  đánh đổi có chủ ý: một `medium` trung thực tốt hơn một `high` không có bằng chứng
+  (over-claim rate giảm từ 40% xuống 20%). Muốn lấy lại khả năng xếp ưu tiên thì phải
+  có `measured_attacker_control`, xem `docs/superpowers/specs/2026-08-23-knowledge-base-two-tier-design.md` §10.
 - Bản đồ endpoint đọc từ Nginx access log, mà log ghi `path=$uri` — path đã
   chuẩn hoá. Tham số lấy từ `query=$args`, nên tham số gửi trong body (được thay
   bằng body chính tắc của lane tại Gateway) không nằm trong URL query.
