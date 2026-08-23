@@ -1,5 +1,4 @@
-"""KB thật phải đúng cấu trúc. Test này chạy trên data/ thật, không phải fixture."""
-
+import json
 from pathlib import Path
 
 import yaml
@@ -11,6 +10,7 @@ KB = REPO_ROOT / "data" / "knowledge-base"
 TIER1 = KB / "tier1"
 TIER2 = KB / "tier2"
 RULES_FILE = REPO_ROOT / "configs" / "opengrep" / "java-security.yml"
+ZAP_FIXTURE = REPO_ROOT / "tests" / "fixtures" / "dast" / "zap-alerts-authenticated.json"
 
 EXPECTED_TIER1_IDS = {
     "sql-injection", "xss", "command-injection", "csrf", "idor",
@@ -31,6 +31,28 @@ def _frontmatter(path: Path) -> dict:
 def _rule_ids() -> set[str]:
     data = yaml.safe_load(RULES_FILE.read_text(encoding="utf-8"))
     return {str(rule["id"]) for rule in data["rules"]}
+
+
+def _zap_plugin_ids() -> set[str]:
+    """Plugin id ZAP co that, lay tu ket qua quet da commit.
+
+    Khong dung isdigit(): no chap nhan moi chuoi so, nen mot id go nham van qua
+    test roi im lang khong khop gi — dung cai loi im lang ma test nay sinh ra de chan.
+    """
+    ids: set[str] = set()
+
+    def walk(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in ("pluginid", "pluginId") and value:
+                    ids.add(str(value))
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(json.loads(ZAP_FIXTURE.read_text(encoding="utf-8")))
+    return ids
 
 
 def test_thu_muc_vulnerabilities_cu_da_bien_mat():
@@ -62,10 +84,13 @@ def test_moi_tier1_parent_tro_toi_doc_co_that():
 
 
 def test_moi_rule_id_duoc_khai_deu_ton_tai_that():
-    known = _rule_ids()
+    known = _rule_ids() | _zap_plugin_ids()
     for entry in load_tier2(TIER2):
         for rule_id in entry.matches_rule_ids:
-            assert rule_id in known or rule_id.isdigit(), f"{entry.id}: rule '{rule_id}' khong co that"
+            assert rule_id in known, (
+                f"{entry.id}: rule '{rule_id}' khong ton tai trong "
+                f"configs/opengrep/*.yml lan fixture ZAP"
+            )
 
 
 def test_entry_khong_co_rule_phai_danh_dau_no_rule_yet():
