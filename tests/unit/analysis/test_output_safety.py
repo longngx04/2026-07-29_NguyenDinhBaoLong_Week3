@@ -234,3 +234,21 @@ def test_prose_describing_sql_characters_is_not_a_payload(text):
         }
     )
     assert scan_unsafe_output(record) == []
+
+
+def test_chinh_sach_csp_that_khong_bi_coi_la_payload_sql():
+    """Do duoc: mau cu lam roi moi finding CSP khoi bao cao."""
+    text = "Dat header: default-src 'self'; script-src 'self'; object-src 'none'"
+    record = _record(remediation=[text])
+    assert scan_unsafe_output(record) == []
+
+
+def test_payload_sql_that_van_bi_chan():
+    for bad in (
+        "' ; DROP TABLE users",
+        "'; DELETE FROM accounts",
+        "' ; UNION SELECT password",
+    ):
+        record = _record(explanation=bad)
+        assert scan_unsafe_output(record), bad
+

@@ -76,7 +76,17 @@ _UNSAFE: tuple[tuple[str, re.Pattern[str]], ...] = (
         re.compile(r"'\s*(?:OR|AND)\s*'?\d*'?\s*=\s*'?\d*", re.IGNORECASE),
     ),
     ("sql_injection_payload", re.compile(r"\bUNION\s+(?:ALL\s+)?SELECT\b", re.IGNORECASE)),
-    ("sql_injection_payload", re.compile(r"'\s*;\s*\w+")),
+    # Mẫu cũ r"'\s*;\s*\w+" bắt cả cú pháp CSP hợp lệ:
+    #   default-src 'self'; script-src 'self'
+    # -> mọi khuyến nghị CSP thật đều bị loại. Thu hẹp: chỉ bắt khi từ ngay sau
+    # dấu ; là một từ khóa SQL, chứ không phải một từ bất kỳ.
+    (
+        "sql_injection_payload",
+        re.compile(
+            r"'\s*;\s*(?:DROP|DELETE|INSERT|UPDATE|SELECT|TRUNCATE|ALTER|CREATE|EXEC|UNION)\b",
+            re.IGNORECASE,
+        ),
+    ),
     # KHONG bat `--` theo sau dau nhay: van xuoi mo ta KY TU ("gui ky tu dac biet
     # nhu ';' hoac '--'") khop luat nay ma khong phai payload. Payload that da
     # duoc bat boi cac luat ' OR / '; / UNION SELECT / DROP TABLE o tren. Mot luat
