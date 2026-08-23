@@ -186,3 +186,31 @@ def test_list_runs_returns_newest_first_even_within_one_second(tmp_path):
 
 
 
+
+
+def test_list_runs_bo_qua_lan_chay_khong_doc_duoc_thay_vi_lam_sap(tmp_path):
+    """Mot thu muc run khong doc duoc KHONG duoc lam sap ca danh sach.
+
+    Quan sat duoc that: tren Docker Desktop, file do container ghi ra thuoc uid 0
+    mode 0600, nhung lop chia se file anh xa bind mount theo user host — nen container
+    sau khong doc duoc. `state_file.exists()` nem PermissionError va toan bo Web UI
+    tra 500, du 20 lan chay khac van doc duoc binh thuong.
+    """
+    runs = tmp_path / "runs"
+    good = new_run(runs)
+    save_run(good)
+
+    bad = runs / "20260823T084826Z"
+    bad.mkdir(parents=True)
+    (bad / "state.json").write_text("{}", encoding="utf-8")
+    # Chan stat tren chinh THU MUC: day la hinh dang that cua loi. `Path.exists()`
+    # cua Python 3.12 chi nuot ENOENT/ENOTDIR/EBADF/ELOOP — EACCES thi no nem ra.
+    bad.chmod(0o000)
+
+    try:
+        names = list_runs(runs)
+    finally:
+        bad.chmod(0o755)
+
+    assert good.run_id in names, "Lan chay doc duoc phai con trong danh sach"
+    assert "20260823T084826Z" not in names, "Lan chay khong doc duoc phai bi bo qua"

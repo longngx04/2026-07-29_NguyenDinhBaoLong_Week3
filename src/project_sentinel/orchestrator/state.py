@@ -201,11 +201,18 @@ def list_runs(runs_dir: str | Path) -> list[str]:
         if item.resolve().parent != resolved_base:
             continue
         state_file = item / "state.json"
-        if not state_file.exists():
-            continue
         try:
+            if not state_file.exists():
+                continue
             raw_state = json.loads(state_file.read_text(encoding="utf-8"))
             created = raw_state["created_at"] if isinstance(raw_state, dict) else ""
+        except PermissionError:
+            # Mot lan chay khong doc duoc KHONG duoc lam sap ca danh sach. Quan sat
+            # duoc that: tren Docker Desktop, file do container ghi ra thuoc uid 0
+            # mode 0600, nhung lop chia se file anh xa bind mount theo user host —
+            # container sau khong stat noi, va toan bo Web UI tra 500 du hang chuc
+            # lan chay khac van doc duoc. Bo qua rieng lan chay do.
+            continue
         except (ValueError, KeyError, OSError, TypeError):
             created = ""  # bản ghi hỏng thì xếp cuối, không làm sập hàm
         entries.append((created, item.name))
