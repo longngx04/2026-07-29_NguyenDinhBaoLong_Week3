@@ -186,6 +186,12 @@ def step_normalize(record: RunRecord, ctx: RunContext) -> RunRecord:
             )
         zap_normalized = record.root / "zap-findings.json"
         zap_added = len(run_normalize(alerts_path, zap_normalized))
+        append_log(
+            record.root,
+            step="normalize",
+            level="info",
+            message=f"Normalized {zap_added} ZAP findings -> {zap_normalized}",
+        )
         # Ghi ra file thu ba roi doi ten, KHONG merge_files([target, x], target):
         # doc va ghi cung mot duong dan chi dung duoc nho merge_files tinh co doc
         # het truoc khi ghi. Dua vao mot chi tiet noi tai nhu vay la mong manh.
