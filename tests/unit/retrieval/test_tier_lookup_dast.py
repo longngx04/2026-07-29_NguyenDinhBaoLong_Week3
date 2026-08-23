@@ -61,3 +61,19 @@ def test_unknown_dast_rule_fallback_to_keyword_on_cwe524():
     assert all(h.match_kind == "keyword" for h in hits)
     assert all(h.tier == 1 for h in hits)
     assert any("caching-policy.md" in h.path for h in hits)
+
+
+def test_moi_header_co_tai_lieu_rieng_khong_dung_chung_doc_csp():
+    """CWE-693 co nhieu entry; tra nham doc se cho loi khuyen khac phuc sai header."""
+    for rule_id, expect in (
+        ("10038", "http-missing-csp-header"),
+        ("10021", "http-missing-xcto-header"),
+        ("10063", "http-missing-permissions-policy"),
+        ("90004", "http-missing-coep-header"),
+    ):
+        entry, kind = lookup_tier2(rule_id, ["CWE-693"], TIER2)
+        assert entry is not None and entry.id == expect, (
+            f"{rule_id} -> {entry.id if entry else None}"
+        )
+        assert kind == "rule_id"
+

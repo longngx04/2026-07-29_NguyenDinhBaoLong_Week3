@@ -49,8 +49,8 @@ def test_moi_doc_tier1_khai_dung_tier():
         assert _frontmatter(path)["tier"] == 1, f"{path.name}"
 
 
-def test_co_dung_muoi_lam_entry_tier2():
-    assert len(load_tier2(TIER2)) == 15
+def test_co_dung_muoi_bay_entry_tier2():
+    assert len(load_tier2(TIER2)) == 17
 
 
 def test_moi_tier1_parent_tro_toi_doc_co_that():
@@ -120,7 +120,7 @@ def test_moi_entry_tier2_co_du_bon_de_muc_chuan():
         "## 4. Tài liệu tham khảo",
     ]
     tier2_files = list(TIER2.glob("*.md"))
-    assert len(tier2_files) == 15, f"Ky vong 15 file Tier 2 nhung tim thay {len(tier2_files)}"
+    assert len(tier2_files) == 17, f"Ky vong 17 file Tier 2 nhung tim thay {len(tier2_files)}"
     for path in tier2_files:
         content = path.read_text(encoding="utf-8")
         for heading in required_headings:
@@ -128,7 +128,7 @@ def test_moi_entry_tier2_co_du_bon_de_muc_chuan():
 
 
 def test_moi_entry_tier2_co_code_block_vulnerable_va_remediated():
-    """Kiem tra 100% 15 file Tier 2 deu co:
+    """Kiem tra 100% 17 file Tier 2 deu co:
     - ### ❌ Không an toàn
     - ### ✅ Đã khắc phục an toàn
     - Chua it nhat mot code block ```java, ```html, hoac ```http
@@ -136,7 +136,7 @@ def test_moi_entry_tier2_co_code_block_vulnerable_va_remediated():
     Bat buoc de Web UI va ky su bao mat co ma doi chung truc quan, khong phong doan.
     """
     tier2_files = list(TIER2.glob("*.md"))
-    assert len(tier2_files) == 15, f"Ky vong 15 file Tier 2 nhung tim thay {len(tier2_files)}"
+    assert len(tier2_files) == 17, f"Ky vong 17 file Tier 2 nhung tim thay {len(tier2_files)}"
     for path in tier2_files:
         content = path.read_text(encoding="utf-8")
         assert "### ❌ Không an toàn" in content, (
@@ -151,14 +151,14 @@ def test_moi_entry_tier2_co_code_block_vulnerable_va_remediated():
 
 
 def test_moi_entry_tier2_khai_references_url_hop_le():
-    """Kiem tra 100% 15 file Tier 2 deu co references (danh sach >= 1 URL)
+    """Kiem tra 100% 17 file Tier 2 deu co references (danh sach >= 1 URL)
     va moi URL deu bat dau bang http:// hoac https://.
 
     Bat buoc de chong troi lien ket tham quyen (OWASP, CWE, Oracle docs),
     phuc vu tao badge lien ket tren Web UI.
     """
     tier2_files = list(TIER2.glob("*.md"))
-    assert len(tier2_files) == 15, f"Ky vong 15 file Tier 2 nhung tim thay {len(tier2_files)}"
+    assert len(tier2_files) == 17, f"Ky vong 17 file Tier 2 nhung tim thay {len(tier2_files)}"
     for path in tier2_files:
         fm = _frontmatter(path)
         refs = fm.get("references")

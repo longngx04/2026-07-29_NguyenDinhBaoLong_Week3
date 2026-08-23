@@ -84,7 +84,7 @@ def test_tai_lieu_khong_noi_sai_so_doc_trong_kho_tri_thuc():
     tier1 = len(list((kb / "tier1").glob("*.md")))
     tier2 = len(list((kb / "tier2").glob("*.md")))
     assert tier1 == 17
-    assert tier2 == 15
+    assert tier2 == 17
 
     for name in ("README.md", "docs/product-brief.md"):
         text = (REPO_ROOT / name).read_text(encoding="utf-8")

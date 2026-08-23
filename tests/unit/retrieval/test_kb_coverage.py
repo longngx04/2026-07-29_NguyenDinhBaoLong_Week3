@@ -15,11 +15,11 @@ TRUTH = (
 
 def test_dem_dung_so_entry_va_so_entry_co_rule():
     report = build_report(TIER2, RULES, TRUTH)
-    assert report["entries"] == 15
+    assert report["entries"] == 17
     assert report["with_sast"] == 3
-    assert report["with_dast"] == 4
+    assert report["with_dast"] == 6
     assert report["without_rule"] == 8
-    assert report["with_rule"] == 7
+    assert report["with_rule"] == 9
 
 
 def test_moi_khoang_trong_kem_so_lo_hong_that_cua_cwe_do():
