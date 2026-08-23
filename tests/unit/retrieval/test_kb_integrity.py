@@ -101,3 +101,115 @@ def test_moi_entry_neu_duoc_dieu_kien_khong_khai_thac_duoc():
             f"{entry.id}: not_exploitable_when qua ngan de co ich"
         )
 
+
+def test_moi_entry_tier2_co_du_bon_de_muc_chuan():
+    """Kiem tra 100% 11 file Tier 2 deu co du 4 de muc chuan:
+    1. Co che rui ro
+    2. Ma nguon minh hoa
+    3. Bien phap khac phuc chuan
+    4. Tai lieu tham khao
+
+    Bat buoc de dam bao cau truc tri thuc dong nhat, phuc vu viec parse hien thi
+    Web Dashboard va cung cap ngu canh chi tiet khi phan tich lo hong.
+    """
+    required_headings = [
+        "## 1. Cơ chế rủi ro",
+        "## 2. Mã nguồn minh họa",
+        "## 3. Biện pháp khắc phục chuẩn",
+        "## 4. Tài liệu tham khảo",
+    ]
+    tier2_files = list(TIER2.glob("*.md"))
+    assert len(tier2_files) == 11, f"Ky vong 11 file Tier 2 nhung tim thay {len(tier2_files)}"
+    for path in tier2_files:
+        content = path.read_text(encoding="utf-8")
+        for heading in required_headings:
+            assert heading in content, f"{path.name}: thieu de muc bat buoc '{heading}'"
+
+
+def test_moi_entry_tier2_co_code_block_vulnerable_va_remediated():
+    """Kiem tra 100% 11 file Tier 2 deu co:
+    - ### ❌ Không an toàn
+    - ### ✅ Đã khắc phục an toàn
+    - Chua it nhat mot code block ```java hoac ```html
+
+    Bat buoc de Web UI va ky su bao mat co ma doi chung truc quan, khong phong doan.
+    """
+    tier2_files = list(TIER2.glob("*.md"))
+    assert len(tier2_files) == 11, f"Ky vong 11 file Tier 2 nhung tim thay {len(tier2_files)}"
+    for path in tier2_files:
+        content = path.read_text(encoding="utf-8")
+        assert "### ❌ Không an toàn" in content, (
+            f"{path.name}: thieu de muc mau khong an toan '### ❌ Không an toàn'"
+        )
+        assert "### ✅ Đã khắc phục an toàn" in content, (
+            f"{path.name}: thieu de muc mau khac phuc '### ✅ Đã khắc phục an toàn'"
+        )
+        assert "```java" in content or "```html" in content, (
+            f"{path.name}: phai chua it nhat mot khoi code ```java hoac ```html"
+        )
+
+
+def test_moi_entry_tier2_khai_references_url_hop_le():
+    """Kiem tra 100% 11 file Tier 2 deu co references (danh sach >= 1 URL)
+    va moi URL deu bat dau bang http:// hoac https://.
+
+    Bat buoc de chong troi lien ket tham quyen (OWASP, CWE, Oracle docs),
+    phuc vu tao badge lien ket tren Web UI.
+    """
+    tier2_files = list(TIER2.glob("*.md"))
+    assert len(tier2_files) == 11, f"Ky vong 11 file Tier 2 nhung tim thay {len(tier2_files)}"
+    for path in tier2_files:
+        fm = _frontmatter(path)
+        refs = fm.get("references")
+        assert isinstance(refs, list) and len(refs) >= 1, (
+            f"{path.name}: 'references' phai la danh sach co it nhat 1 URL tham chieu"
+        )
+        for url in refs:
+            assert isinstance(url, str) and (
+                url.startswith("http://") or url.startswith("https://")
+            ), f"{path.name}: URL tham chieu '{url}' khong hop le (phai bat dau bang http:// hoac https://)"
+
+
+def test_moi_doc_tier1_co_du_bon_de_muc_chuan():
+    """Kiem tra 100% 14 file Tier 1 deu co du 4 de muc chuan:
+    1. Khai niem & Moi de doa
+    2. Cac bien the pho bien
+    3. Nguyen tac phong thu da lop
+    4. Tai lieu tham khao tham quyen
+
+    Giup duy tri cau truc tai lieu phan loai lo hong dong bo cho toan bo 14 lop CWE/OWASP.
+    """
+    required_headings = [
+        "## 1. Khái niệm & Mối đe dọa",
+        "## 2. Các biến thể phổ biến",
+        "## 3. Nguyên tắc phòng thủ đa lớp",
+        "## 4. Tài liệu tham khảo thẩm quyền",
+    ]
+    tier1_files = list(TIER1.glob("*.md"))
+    assert len(tier1_files) == 14, f"Ky vong 14 file Tier 1 nhung tim thay {len(tier1_files)}"
+    for path in tier1_files:
+        content = path.read_text(encoding="utf-8")
+        for heading in required_headings:
+            assert heading in content, f"{path.name}: thieu de muc bat buoc '{heading}'"
+
+
+def test_moi_doc_tier1_khai_references_url_hop_le():
+    """Kiem tra 100% 14 file Tier 1 deu co truong references trong frontmatter
+    va moi URL deu hop le (bat dau bang http:// hoac https://).
+
+    Giup lien ket truc tiep toi OWASP Top 10 va CWE Definitions.
+    """
+    tier1_files = list(TIER1.glob("*.md"))
+    assert len(tier1_files) == 14, f"Ky vong 14 file Tier 1 nhung tim thay {len(tier1_files)}"
+    for path in tier1_files:
+        fm = _frontmatter(path)
+        refs = fm.get("references")
+        assert isinstance(refs, list) and len(refs) >= 1, (
+            f"{path.name}: 'references' phai la danh sach co it nhat 1 URL tham chieu"
+        )
+        for url in refs:
+            assert isinstance(url, str) and (
+                url.startswith("http://") or url.startswith("https://")
+            ), f"{path.name}: URL tham chieu '{url}' khong hop le (phai bat dau bang http:// hoac https://)"
+
+
