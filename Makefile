@@ -132,7 +132,10 @@ run:
 	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
 	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
 	test -n "$$KEY" || (printf '%s\n' 'SENTINEL_GATEWAY_API_KEY is required in the environment or .env' >&2; exit 2); \
-	SENTINEL_GATEWAY_API_KEY="$$KEY" $(PYTHON) -m project_sentinel.cli run
+	DAST_KEY=$${SENTINEL_DAST_API_KEY:-$$(sed -n 's/^SENTINEL_DAST_API_KEY=//p' .env 2>/dev/null)}; \
+	ZAP_KEY=$${SENTINEL_ZAP_API_KEY:-$$(sed -n 's/^SENTINEL_ZAP_API_KEY=//p' .env 2>/dev/null)}; \
+	SENTINEL_GATEWAY_API_KEY="$$KEY" SENTINEL_DAST_API_KEY="$$DAST_KEY" SENTINEL_ZAP_API_KEY="$$ZAP_KEY" \
+	$(PYTHON) -m project_sentinel.cli run
 
 runs:
 	@$(PYTHON) -m project_sentinel.cli runs
