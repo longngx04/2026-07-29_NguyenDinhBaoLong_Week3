@@ -76,11 +76,21 @@ services:
     image: ghcr.io/zaproxy/zaproxy@sha256:8d387b1a63e3425beef4846e39719f5af2a787753af2d8b6558c6257d7a577a2
     # Daemon chay suot vong doi stack. Container `web` khong co Docker nen no
     # khong the `docker compose run zap`; no dieu khien daemon nay qua API.
-    command: >
-      zap.sh -daemon -host 0.0.0.0 -port 8090
-      -config api.key=${SENTINEL_ZAP_API_KEY}
-      -config api.addrs.addr.name=.*
-      -config api.addrs.addr.regex=true
+    # Dang DANH SACH, khong dung folded scalar `>`: chuoi mot dong bi tach nhap
+    # nhang khien ZAP bo qua `-port` va roi ve mot cong ngau nhien tren localhost.
+    command:
+      - zap.sh
+      - -daemon
+      - -host
+      - 0.0.0.0
+      - -port
+      - "8090"
+      - -config
+      - api.key=${SENTINEL_ZAP_API_KEY}
+      - -config
+      - api.addrs.addr.name=.*
+      - -config
+      - api.addrs.addr.regex=true
     # `expose` chu KHONG `ports`: API cua ZAP dieu khien duoc mot trinh duyet
     # tan cong, no khong duoc xuat hien tren bat ky giao dien host nao.
     expose:

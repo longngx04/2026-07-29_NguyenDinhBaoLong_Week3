@@ -13,6 +13,7 @@ rò rỉ ra artifact. Mất một trong hai là mất lý do tồn tại của G
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import time
@@ -22,7 +23,6 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 DEFAULT_PLAN = "/zap/plans/scan-plan.yaml"
 DEFAULT_GATEWAY_LOG = Path("/var/log/sentinel/dast-access.log")
@@ -40,9 +40,15 @@ class ZapConfig:
     dast_header: str = "X-Sentinel-DAST-Key"
     plan_path: str = DEFAULT_PLAN
     gateway_log_path: Path = DEFAULT_GATEWAY_LOG
-    ready_timeout_s: float = 120.0
+    # Do duoc: ZAP 2.17 mat ~130s de mo API (no kiem 24 addon cap nhat luc khoi
+    # dong). Mac dinh 120s tung lam client bo cuoc ngay truoc khi daemon san sang.
+    ready_timeout_s: float = 300.0
     plan_timeout_s: float = 600.0
     poll_interval_s: float = 2.0
+    # ZAP ghi bao cao vao mount cua no; container web doc cung thu muc do qua
+    # mount cua minh. Hai duong dan tro cung mot cho tren host.
+    report_dir_in_zap: str = "/zap/wrk/raw"
+    report_dir_local: Path = Path("/app/artifacts/raw")
 
     @classmethod
     def from_env(cls) -> ZapConfig:
@@ -69,8 +75,21 @@ def _http_call(config: ZapConfig) -> Callable[[str, dict[str, str]], dict]:
         try:
             with urllib.request.urlopen(url, timeout=30) as response:  # noqa: S310
                 return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            # ZAP tra ma loi co cau truc trong body (vd `already_exists`). Khong co
+            # no thi thong diep chi la "HTTPError" — khong go loi duoc.
+            # Van KHONG bao gio dua `url` vao: query string cua no chua apikey.
+            detail = ""
+            try:
+                body = json.loads(exc.read().decode("utf-8"))
+                detail = str(body.get("code") or body.get("message") or "")
+            except Exception:  # noqa: BLE001 — body hong thi bo qua, van bao loi
+                detail = ""
+            suffix = f" ({detail})" if detail else ""
+            raise DastError(
+                f"Goi ZAP API '{path}' that bai: HTTP {exc.code}{suffix}"
+            ) from exc
         except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
-            # KHONG bao gio dua `url` vao thong diep: query string cua no chua apikey.
             raise DastError(
                 f"Goi ZAP API '{path}' that bai: {type(exc).__name__}"
             ) from exc
@@ -106,7 +125,17 @@ def _add_dast_key_header(
     """Tiem header xac thuc cua lane DAST vao moi request ZAP gui đi.
 
     Khong co no thi Gateway tu choi het va ZAP khong cham duoc WebGoat.
+
+    XOA rule cu TRUOC khi them. Daemon song theo vong doi stack nen rule cua lan
+    quet truoc van con, va ZAP tra `already_exists` neu them trung description —
+    tu lan thu hai tro di se hong. Xoa-roi-them chu KHONG coi `already_exists` la
+    thanh cong: neu khoa DAST doi (make up moi), giu rule cu se khien ZAP tiem
+    khoa cu va Gateway tu choi sach.
     """
+    # Lan dau chay thi chua co gi de xoa. Khong phai loi.
+    with contextlib.suppress(DastError):
+        call("replacer/action/removeRule", {"description": "sentinel-dast-key"})
+
     call(
         "replacer/action/addRule",
         {
@@ -142,13 +171,46 @@ def _run_plan(
     raise DastError(f"Plan ZAP khong xong trong {config.plan_timeout_s}s")
 
 
-def _write_report(report_path: Path, alerts: list[dict[str, Any]]) -> None:
-    # Giu nguyen hinh dang {"site": [{"alerts": [...]}]} ma zap_normalizer dang doc,
-    # de khong phai sua tang chuan hoa.
-    payload = {"site": [{"@name": "sentinel-dast", "alerts": alerts}]}
+def _new_session(call: Callable[[str, dict[str, str]], dict]) -> None:
+    """Xoa phien truoc khi quet.
+
+    Daemon song theo vong doi stack nen alert TICH LUY qua cac lan quet. Do duoc:
+    mot lan chay tra 172 alert trong khi thuc te chi ~10 loai — phan con lai la cua
+    lan quet truoc. Script cu tao container ZAP moi moi lan nen khong gap.
+    """
+    call("core/action/newSession", {"name": "sentinel-dast", "overwrite": "true"})
+
+
+def _generate_report(
+    call: Callable[[str, dict[str, str]], dict],
+    config: ZapConfig,
+    report_path: Path,
+) -> None:
+    """Nho CHINH ZAP sinh bao cao `traditional-json`.
+
+    `core/view/alerts` tra `pluginId` camelCase va alert phang, trong khi
+    `ingestion/zap_normalizer` doc `pluginid` chu thuong va mang `instances`. Do
+    duoc: tu nan hinh dang cho ra 0 finding. Dung bo sinh cua ZAP thi dinh dang
+    giong het thu `zap-baseline.py -J` tung tao ra, khong co gi de troi.
+    """
+    name = "zap-daemon-report.json"
+    call(
+        "reports/action/generate",
+        {
+            "title": "sentinel-dast",
+            "template": "traditional-json",
+            "reportDir": config.report_dir_in_zap,
+            "reportFileName": name,
+        },
+    )
+    produced = config.report_dir_local / name
+    if not produced.is_file():
+        raise DastError(f"ZAP bao da sinh bao cao nhung khong thay tai {produced}")
+
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    report_path.write_bytes(produced.read_bytes())
     report_path.chmod(0o600)
+    produced.unlink(missing_ok=True)
 
 
 def _assert_traffic_went_through_gateway(log_path: Path) -> None:
@@ -180,6 +242,7 @@ def run_dast(
     api = call or _http_call(config)
 
     _wait_until_ready(api, config, sleep)
+    _new_session(api)
     _add_dast_key_header(api, config)
 
     # Ghi lai vi tri cuoi file log TRUOC khi chay plan. Script cu dung
@@ -194,8 +257,7 @@ def run_dast(
 
     _run_plan(api, config, sleep)
 
-    alerts = api("core/view/alerts", {}).get("alerts") or []
-    _write_report(report_path, list(alerts))
+    _generate_report(api, config, report_path)
 
     if not config.gateway_log_path.is_file():
         raise DastError(f"Khong thay log Gateway DAST tai {config.gateway_log_path}")

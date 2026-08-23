@@ -25,20 +25,35 @@ def _config(tmp_path: Path, **overrides) -> ZapConfig:
         "ready_timeout_s": 5.0,
         "plan_timeout_s": 5.0,
         "poll_interval_s": 0.0,
+        "report_dir_in_zap": str(tmp_path / "zapout"),
+        "report_dir_local": tmp_path / "zapout",
     }
     base.update(overrides)
     return ZapConfig(**base)
 
 
-def _fake_call(alerts=None, progress=None, gateway_log=None):
+def _fake_call(alerts=None, progress=None, gateway_log=None, record=None, leak=None):
     """Transport gia: tra ve phan hoi theo path duoc goi."""
-    calls: list[str] = []
+    calls: list[str] = record if record is not None else []
 
     def call(path: str, params: dict) -> dict:
         calls.append(path)
+        if path == "core/action/newSession":
+            return {"Result": "OK"}
+        if path == "reports/action/generate":
+            target = Path(params["reportDir"]) / params["reportFileName"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            body = {"site": [{"@name": "x", "alerts": [
+                {"pluginid": "10038", "alert": "CSP Header Not Set",
+                 "other": leak or "",
+                 "instances": [{"uri": "http://gateway-dast:8081/WebGoat/login",
+                                "method": "GET", "param": ""}]}
+            ]}]}
+            target.write_text(json.dumps(body), encoding="utf-8")
+            return {"generate": str(target)}
         if path == "core/view/version":
             return {"version": "2.17.0"}
-        if path == "replacer/action/addRule":
+        if path in ("replacer/action/removeRule", "replacer/action/addRule"):
             return {"Result": "OK"}
         if path == "automation/action/runPlan":
             # Gateway ghi bang chung TRONG LUC plan chay, khong phai truoc do.
@@ -59,14 +74,14 @@ def _fake_call(alerts=None, progress=None, gateway_log=None):
 def test_duong_thuan_loi_ghi_ra_bao_cao_va_log(tmp_path):
     report = tmp_path / "zap-alerts.json"
     out_log = tmp_path / "out.log"
-    call = _fake_call(alerts=[{"pluginId": "10038", "alert": "CSP Header Not Set"}],
-                      gateway_log=tmp_path / "dast-access.log")
+    call = _fake_call(gateway_log=tmp_path / "dast-access.log")
 
     run_dast(report, out_log, config=_config(tmp_path), call=call, sleep=lambda _: None)
 
     payload = json.loads(report.read_text(encoding="utf-8"))
     assert isinstance(payload["site"], list)
-    assert payload["site"][0]["alerts"][0]["pluginId"] == "10038"
+    # `pluginid` chu thuong: dung truong ma ingestion/zap_normalizer doc.
+    assert payload["site"][0]["alerts"][0]["pluginid"] == "10038"
     assert out_log.read_text(encoding="utf-8") == GATEWAY_LOG
 
 
@@ -115,8 +130,7 @@ def test_log_gateway_khong_co_dong_dast_nao_thi_bao_loi(tmp_path):
 
 
 def test_khoa_dast_ro_ri_vao_bao_cao_thi_bao_loi(tmp_path):
-    call = _fake_call(alerts=[{"pluginId": "1", "other": "dastkey"}],
-                      gateway_log=tmp_path / "dast-access.log")
+    call = _fake_call(gateway_log=tmp_path / "dast-access.log", leak="dastkey")
     with pytest.raises(DastError, match="ro ri"):
         run_dast(
             tmp_path / "r.json", tmp_path / "l.log",
@@ -157,3 +171,133 @@ def test_bang_chung_cu_cua_lan_quet_truoc_khong_duoc_tinh(tmp_path):
             call=_fake_call(),  # khong ghi them gi trong luc plan chay
             sleep=lambda _: None,
         )
+
+
+def test_chay_lan_thu_hai_khong_hong_vi_rule_da_ton_tai(tmp_path):
+    """Daemon song lau, nen rule replacer con lai tu lan quet truoc. ZAP tra
+    `already_exists` neu them trung description. Script cu tao container ZAP moi
+    moi lan nen khong gap; thiet ke nay thi gap tu lan thu hai tro di."""
+    seen: list[str] = []
+
+    def call(path: str, params: dict) -> dict:
+        seen.append(path)
+        if path == "core/view/version":
+            return {"version": "2.17.0"}
+        if path in ("replacer/action/removeRule", "replacer/action/addRule"):
+            return {"Result": "OK"}
+        if path == "core/action/newSession":
+            return {"Result": "OK"}
+        if path == "reports/action/generate":
+            target = Path(params["reportDir"]) / params["reportFileName"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                json.dumps({"site": [{"@name": "x", "alerts": [{"pluginid": "1"}]}]}),
+                encoding="utf-8",
+            )
+            return {"generate": str(target)}
+        if path == "automation/action/runPlan":
+            (tmp_path / "dast-access.log").write_text(GATEWAY_LOG, encoding="utf-8")
+            return {"planId": "7"}
+        if path == "automation/view/planProgress":
+            return {"planId": "7", "finished": "x", "error": []}
+        raise AssertionError(path)
+
+    run_dast(
+        tmp_path / "r.json", tmp_path / "l.log",
+        config=_config(tmp_path), call=call, sleep=lambda _: None,
+    )
+    assert seen.index("replacer/action/removeRule") < seen.index(
+        "replacer/action/addRule"
+    ), "Phai xoa rule cu TRUOC khi them, neu khong lan thu hai se hong"
+
+
+def test_xoa_rule_that_bai_khong_lam_hong_ca_lan_quet(tmp_path):
+    """Lan dau chay thi chua co rule nao de xoa. Do khong phai loi."""
+    def call(path: str, params: dict) -> dict:
+        if path == "replacer/action/removeRule":
+            raise DastError("does_not_exist")
+        if path == "core/view/version":
+            return {"version": "2.17.0"}
+        if path == "replacer/action/addRule":
+            return {"Result": "OK"}
+        if path == "core/action/newSession":
+            return {"Result": "OK"}
+        if path == "reports/action/generate":
+            target = Path(params["reportDir"]) / params["reportFileName"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                json.dumps({"site": [{"@name": "x", "alerts": [{"pluginid": "1"}]}]}),
+                encoding="utf-8",
+            )
+            return {"generate": str(target)}
+        if path == "automation/action/runPlan":
+            (tmp_path / "dast-access.log").write_text(GATEWAY_LOG, encoding="utf-8")
+            return {"planId": "7"}
+        if path == "automation/view/planProgress":
+            return {"planId": "7", "finished": "x", "error": []}
+        raise AssertionError(path)
+
+    run_dast(
+        tmp_path / "r.json", tmp_path / "l.log",
+        config=_config(tmp_path), call=call, sleep=lambda _: None,
+    )
+
+
+def test_thong_diep_loi_neu_ma_loi_cua_zap_de_chan_doan_duoc(tmp_path):
+    """`HTTPError` tran khong du de go loi. Phai co ma loi cua ZAP, nhung van
+    KHONG duoc co apikey."""
+    import io
+    import urllib.error
+    from project_sentinel.dast.zap_client import _http_call
+
+    body = io.BytesIO(b'{"code":"already_exists","message":"Already Exists"}')
+    err = urllib.error.HTTPError("http://zap/x", 400, "Bad Request", {}, body)
+
+    def fake_urlopen(*args, **kwargs):
+        raise err
+
+    import project_sentinel.dast.zap_client as mod
+
+    original = mod.urllib.request.urlopen
+    mod.urllib.request.urlopen = fake_urlopen
+    try:
+        with pytest.raises(DastError) as caught:
+            _http_call(_config(tmp_path))("replacer/action/addRule", {})
+    finally:
+        mod.urllib.request.urlopen = original
+
+    message = str(caught.value)
+    assert "already_exists" in message, f"thieu ma loi cua ZAP: {message}"
+    assert "zapkey" not in message
+
+
+def test_moi_lan_quet_bat_dau_bang_mot_phien_moi(tmp_path):
+    """Daemon song lau nen alert tich luy qua cac lan quet. Do duoc: mot lan chay
+    tra 172 alert trong khi thuc te chi ~10 loai — phan con lai la cua lan truoc."""
+    seen: list[str] = []
+    call = _fake_call(gateway_log=tmp_path / "dast-access.log", record=seen)
+    run_dast(
+        tmp_path / "r.json", tmp_path / "l.log",
+        config=_config(tmp_path), call=call, sleep=lambda _: None,
+    )
+    assert "core/action/newSession" in seen
+    assert seen.index("core/action/newSession") < seen.index(
+        "automation/action/runPlan"
+    ), "Phai xoa phien TRUOC khi quet, khong thi bao cao gom ca alert cu"
+
+
+def test_bao_cao_do_chinh_zap_sinh_ra_de_dung_dinh_dang_normalizer_doc(tmp_path):
+    """`core/view/alerts` tra pluginId camelCase va alert phang; normalizer doc
+    `pluginid` chu thuong va mang `instances`. Do duoc: tu nan hinh dang cho ra
+    0 finding. Dung bo sinh bao cao cua ZAP thi khong phai nan tay."""
+    seen: list[str] = []
+    call = _fake_call(gateway_log=tmp_path / "dast-access.log", record=seen)
+    report = tmp_path / "r.json"
+    run_dast(
+        report, tmp_path / "l.log",
+        config=_config(tmp_path), call=call, sleep=lambda _: None,
+    )
+    assert "reports/action/generate" in seen
+    assert "pluginid" in report.read_text(encoding="utf-8"), (
+        "Bao cao phai giu truong `pluginid` chu thuong ma normalizer doc"
+    )

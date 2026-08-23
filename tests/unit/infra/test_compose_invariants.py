@@ -140,8 +140,13 @@ def test_zap_api_never_reaches_the_host(compose):
 
 
 def test_zap_runs_as_a_daemon_with_a_key_from_the_environment(compose):
-    command = " ".join(compose["services"]["zap"].get("command", "").split())
+    """Command phai o dang DANH SACH. Dang chuoi mot dong bi tach nhap nhang khien
+    ZAP bo qua `-port` va roi ve mot cong ngau nhien tren localhost — quan sat duoc
+    that: no nghe 127.0.0.1:42225 thay vi 0.0.0.0:8090."""
+    command = compose["services"]["zap"].get("command")
+    assert isinstance(command, list), f"command phai la danh sach, dang la {type(command)}"
     assert "-daemon" in command
+    assert "8090" in command and "-port" in command
     assert "api.key=${SENTINEL_ZAP_API_KEY}" in command, (
         "Khoa API phai lay tu bien moi truong, khong duoc la hang trong file"
     )
