@@ -169,3 +169,21 @@ def test_dast_log_volume_is_shared_and_web_can_only_read_it(compose):
     ro = [v for v in web if "sentinel-dast-log" in v]
     assert ro, "web phai mount volume log"
     assert ro[0].endswith(":ro"), f"web phai mount CHI DOC, dang la {ro[0]}"
+
+
+def test_zap_command_never_uses_a_run_and_exit_action(compose):
+    """`-addoninstall` la lenh chay-roi-thoat: ZAP cai xong addon roi TAT, va
+    container chet. Quan sat duoc that. Viec cai addon thuoc ve client."""
+    command = compose["services"]["zap"]["command"]
+    assert "-addoninstall" not in command
+    assert "-daemon" in command
+
+
+def test_zap_healthcheck_proves_the_api_is_actually_listening(compose):
+    """Quan sat duoc: ZAP thinh thoang bo qua `-port` va roi ve mot cong ngau nhien
+    tren localhost. Khong co healthcheck thi container bao "Up" trong khi API chet,
+    va client chi phat hien sau khi cho het han gio."""
+    health = compose["services"]["zap"].get("healthcheck")
+    assert health, "zap phai co healthcheck"
+    probe = " ".join(health["test"])
+    assert "8090" in probe and "core/view/version" in probe

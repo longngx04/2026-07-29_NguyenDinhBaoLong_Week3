@@ -38,7 +38,7 @@ def _fake_call(alerts=None, progress=None, gateway_log=None, record=None, leak=N
 
     def call(path: str, params: dict) -> dict:
         calls.append(path)
-        if path == "core/action/newSession":
+        if path in ("core/action/newSession", "autoupdate/action/installAddon"):
             return {"Result": "OK"}
         if path == "reports/action/generate":
             target = Path(params["reportDir"]) / params["reportFileName"]
@@ -185,7 +185,7 @@ def test_chay_lan_thu_hai_khong_hong_vi_rule_da_ton_tai(tmp_path):
             return {"version": "2.17.0"}
         if path in ("replacer/action/removeRule", "replacer/action/addRule"):
             return {"Result": "OK"}
-        if path == "core/action/newSession":
+        if path in ("core/action/newSession", "autoupdate/action/installAddon"):
             return {"Result": "OK"}
         if path == "reports/action/generate":
             target = Path(params["reportDir"]) / params["reportFileName"]
@@ -218,9 +218,9 @@ def test_xoa_rule_that_bai_khong_lam_hong_ca_lan_quet(tmp_path):
             raise DastError("does_not_exist")
         if path == "core/view/version":
             return {"version": "2.17.0"}
-        if path == "replacer/action/addRule":
+        if path in ("replacer/action/addRule", "autoupdate/action/installAddon"):
             return {"Result": "OK"}
-        if path == "core/action/newSession":
+        if path in ("core/action/newSession", "autoupdate/action/installAddon"):
             return {"Result": "OK"}
         if path == "reports/action/generate":
             target = Path(params["reportDir"]) / params["reportFileName"]
@@ -301,3 +301,22 @@ def test_bao_cao_do_chinh_zap_sinh_ra_de_dung_dinh_dang_normalizer_doc(tmp_path)
     assert "pluginid" in report.read_text(encoding="utf-8"), (
         "Bao cao phai giu truong `pluginid` chu thuong ma normalizer doc"
     )
+
+
+def test_client_tu_cai_bo_rule_beta_va_khong_hong_neu_that_bai(tmp_path):
+    """Bon rule 10049/10063/10110/90004 nam trong bo beta, khong co san trong anh.
+    Khong cai duoc thi quet van phai chay — mat mot canh bao de chiu hon la mat ca
+    lan quet."""
+    seen: list[str] = []
+
+    def call(path: str, params: dict) -> dict:
+        seen.append(path)
+        if path == "autoupdate/action/installAddon":
+            raise DastError("khong co mang")
+        return _fake_call(gateway_log=tmp_path / "dast-access.log", record=[])(path, params)
+
+    run_dast(
+        tmp_path / "r.json", tmp_path / "l.log",
+        config=_config(tmp_path), call=call, sleep=lambda _: None,
+    )
+    assert "autoupdate/action/installAddon" in seen

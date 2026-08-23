@@ -129,6 +129,11 @@ make run
 
 # Or launch the interactive Web UI
 make web
+
+# Full stack in Docker: WebGoat, Gateway (probe + DAST lanes), ZAP daemon, web UI.
+# Bấm quét từ giao diện chạy CẢ SAST lẫn DAST — container web điều khiển ZAP qua API
+# nội bộ, nó không có Docker CLI và không có docker socket.
+make up
 ```
 
 ---

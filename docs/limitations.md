@@ -103,3 +103,22 @@ xuôi thì không có cách xác minh tự động.
   được body tới WebGoat — chỉ chạy khi gõ `make dast-test` bằng tay.
 - Chỉ chạy được một lần quét tại một thời điểm; không có hàng đợi công việc.
 
+- **Khoá DAST tồn tại theo vòng đời stack, không theo từng lần quét.** Docker Compose
+  truyền `SENTINEL_DAST_API_KEY` vào `gateway-dast` lúc **tạo container**, nên không thể
+  cấp khoá mới cho mỗi lần quét mà không dựng lại container. Trước đây `scan-zap.sh` sinh
+  khoá tạm cho từng lần chạy; đổi sang ZAP daemon thì mất tính chất đó. Giảm nhẹ: khoá
+  vẫn sinh ngẫu nhiên mỗi lần `make up`, không bao giờ vào Git, không bao giờ ra host, và
+  kiểm tra chống rò rỉ khoá vào báo cáo/log vẫn giữ nguyên.
+- **ZAP daemon là một service chạy suốt có API điều khiển được.** Nó bị chặn ba lớp: khai
+  `expose` chứ không `ports` nên không có cổng host, bắt buộc API key, và chỉ nằm trên
+  mạng nội bộ `sentinel-net`. Có test khoá cả ba trong
+  `tests/unit/infra/test_compose_invariants.py`.
+- **ZAP daemon đôi khi bỏ qua `-port` và rơi về một cổng ngẫu nhiên trên localhost.**
+  Quan sát được trên máy phát triển: cùng một lệnh, có lần bind `0.0.0.0:8090`, có lần
+  bind `127.0.0.1:33397`. Khi rơi vào trường hợp sau, DAST bị bỏ qua và lần chạy vẫn
+  hoàn thành với chỉ finding SAST. Healthcheck của service `zap` kiểm đúng điều này nên
+  lỗi hiện ra ở `docker compose ps` thay vì im lặng. Chưa tìm được nguyên nhân gốc.
+- **Bốn rule passive 10049, 10063, 10110, 90004 nằm trong bộ `pscanrulesBeta`,** không có
+  sẵn trong ảnh ZAP. Client tự cài chúng qua API mỗi lần quét. Cài được thì kết quả khớp
+  luồng `zap-baseline.py` cũ; không có mạng thì quét vẫn chạy nhưng thiếu bốn cảnh báo đó.
+  Phiên bản add-on **không** được pin theo digest như ảnh.

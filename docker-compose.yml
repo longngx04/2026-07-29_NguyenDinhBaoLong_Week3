@@ -95,7 +95,18 @@ services:
     # tan cong, no khong duoc xuat hien tren bat ky giao dien host nao.
     expose:
       - "8090"
+    # Quan sat duoc: ZAP thinh thoang BO QUA `-port` va roi ve mot cong ngau nhien
+    # tren localhost (vd 127.0.0.1:33397). Khong co healthcheck thi container van
+    # bao "Up" con client thi cho het 300s roi bao loi mo ho. Healthcheck nay bat
+    # dung dieu can bat: API co that su nghe o 8090 khong.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf \"http://127.0.0.1:8090/JSON/core/view/version/?apikey=$$SENTINEL_ZAP_API_KEY\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     environment:
+      - SENTINEL_ZAP_API_KEY=${SENTINEL_ZAP_API_KEY:-}
       - ZAP_AUTH_HEADER=X-Sentinel-DAST-Key
       - ZAP_AUTH_HEADER_VALUE=${SENTINEL_DAST_API_KEY:-}
     volumes:

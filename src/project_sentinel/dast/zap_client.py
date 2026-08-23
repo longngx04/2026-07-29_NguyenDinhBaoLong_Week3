@@ -171,6 +171,21 @@ def _run_plan(
     raise DastError(f"Plan ZAP khong xong trong {config.plan_timeout_s}s")
 
 
+def _ensure_beta_passive_rules(call: Callable[[str, dict[str, str]], dict]) -> None:
+    """Cai bo rule passive `beta` neu chua co.
+
+    Bon rule 10049/10063/10110/90004 nam trong bo nay va KHONG co san trong anh
+    ZAP. `zap-baseline.py` van tu tai chung luc khoi dong, nen day khong phai phu
+    thuoc moi — chi la lam no hien ra. Khong cai duoc thi quet van chay, chi it
+    rule hon: mat mot canh bao con de chiu hon la khong quet duoc gi.
+
+    KHONG dat viec nay vao `command` cua container: `-addoninstall` la lenh
+    chay-roi-thoat, no cai xong roi tat ZAP va container chet.
+    """
+    with contextlib.suppress(DastError):
+        call("autoupdate/action/installAddon", {"id": "pscanrulesBeta"})
+
+
 def _new_session(call: Callable[[str, dict[str, str]], dict]) -> None:
     """Xoa phien truoc khi quet.
 
@@ -242,6 +257,7 @@ def run_dast(
     api = call or _http_call(config)
 
     _wait_until_ready(api, config, sleep)
+    _ensure_beta_passive_rules(api)
     _new_session(api)
     _add_dast_key_header(api, config)
 
