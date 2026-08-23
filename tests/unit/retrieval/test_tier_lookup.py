@@ -72,14 +72,29 @@ def test_moi_hit_deu_mang_tier_va_match_kind_trong_to_dict():
         assert payload["match_kind"] in {"rule_id", "cwe", "parent", "keyword"}
 
 
-def test_finding_khong_khop_tier2_van_co_hit_keyword():
+def test_co_hit_tier2_thi_khong_con_hit_keyword():
     hits = retrieve_knowledge(
-        title="Cross-Site Scripting",
-        rule_id="khong-co-rule-nay",
-        cwe=["CWE-79"],
+        title="SQL query built by string concatenation",
+        rule_id="java-sql-statement-execution",
+        cwe=["CWE-89"],
         knowledge_dir=TIER1,
     )
-    assert hits, "Phải có ít nhất một hit từ keyword search"
+    assert any(h.tier == 2 for h in hits)
+    assert not any(h.match_kind == "keyword" for h in hits), (
+        "Doc Tier 1 dung da nam o kenh parent; keyword chi con hang 2-3 sai ho"
+    )
+
+
+def test_khong_co_hit_tier2_thi_keyword_van_phai_chay():
+    """Duong nay phuc vu finding DAST — khong duoc lam mat."""
+    hits = retrieve_knowledge(
+        title="Weak hash function",
+        rule_id="khong-co",
+        cwe=["CWE-327"],
+        knowledge_dir=TIER1,
+    )
+    assert hits
+    assert all(h.match_kind == "keyword" for h in hits)
 
 
 def test_keyword_search_khong_bao_gio_tra_ve_doc_tier2():

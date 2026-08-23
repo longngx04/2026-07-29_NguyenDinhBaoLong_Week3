@@ -205,8 +205,12 @@ finding
 Luôn kèm: mỗi hit Tier 2 kéo theo tier1_parent      match_kind="parent"
 ```
 
-Mức 2 chỉ chạy khi mức 1 không ra kết quả. Mức 3 luôn chạy, nhưng chỉ trên `tier1/` — để
-keyword search không cạnh tranh với tra cứu tất định trên cùng một không gian.
+Mức 2 chỉ chạy khi mức 1 không ra kết quả. Mức 3 chỉ chạy khi hai mức trên không
+ra kết quả (khi đã có tri thức tất định Tier 2 và tài liệu cha kéo theo, keyword
+search chỉ còn đóng góp các kết quả hạng 2-3 thuộc họ khác — đo được 46/46 hit
+keyword trên 23 finding SAST đều sai họ lỗ hổng). Khi chạy, Mức 3 chỉ quét trên
+`tier1/` — để keyword search không cạnh tranh với tra cứu tất định trên cùng một
+không gian.
 
 Mỗi hit trong packet mang thêm `tier` và `match_kind`. Đây là hai trường **chỉ ở phía đầu
 vào và trong artifact**, không có trong output schema.
