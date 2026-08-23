@@ -103,15 +103,16 @@ print('loi     :', m['errors']['total'])
 Kỳ vọng: khoảng **37 finding** chia hai nguồn, `decided_by: ['cli-operator']`, 1 request,
 0 lỗi. Nếu `findings_by_tool` chỉ có `opengrep`, DAST đã bị bỏ qua — xem §5.
 
-**Bước 6 — Mở sẵn các tab trình duyệt**
+**Bước 6 — Mở một tab trình duyệt**
 
 | Tab | Địa chỉ | Dùng ở phút |
 | :--- | :--- | :--- |
-| 1 | `http://127.0.0.1:8000` | 3 |
-| 2 | `http://127.0.0.1:8000/runs/<run-id>` | 5 |
-| 3 | `http://127.0.0.1:8000/runs/<run-id>/findings` | 6 |
-| 4 | `http://127.0.0.1:8000/runs/<run-id>/analysis` | 8 |
-| 5 | `http://127.0.0.1:8000/approvals` | 10 |
+| 1 | `http://127.0.0.1:8000` | 3 → 15 |
+
+Chỉ cần một tab. Bảng điều khiển hiển thị toàn bộ một lần chạy trên cùng một
+trang: tiến trình chín bước, nhật ký thực thi, thẻ phê duyệt, và bốn tab bằng
+chứng (Cảnh báo · Phân tích · Sự kiện bảo mật · Gateway). Lịch sử các lần chạy
+nằm ở `/history`, chỉ mở khi cần so sánh giữa các lần chạy.
 
 **Bước 7 — Mở sẵn hai cửa sổ terminal**
 

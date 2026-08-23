@@ -22,6 +22,31 @@ STEP_NAMES: tuple[str, ...] = (
 )
 
 VALID_STATUSES = frozenset({"pending", "running", "done", "failed", "skipped"})
+
+# Ngân sách thời gian im lặng của từng bước, tính bằng giây.
+#
+# Web dùng con số này để phân biệt "đang chạy lâu" với "đã treo". Ngưỡng phải
+# theo TỪNG bước chứ không thể là một hằng chung: một lần chạy thật đo được
+# `analyze` im lặng 251 giây liền (LLM không phát log giữa chừng) trong khi
+# `normalize` xong trong 0,14 giây. Một ngưỡng chung hoặc báo động giả suốt
+# bước analyze, hoặc phải nới rộng tới mức không còn phát hiện được gì.
+#
+# Mỗi giá trị là bội số rộng của thời gian quan sát được, để mạng chậm hoặc
+# LLM phải thử lại không bị kết luận nhầm là treo.
+DEFAULT_STEP_BUDGET_S = 120
+STEP_BUDGET_S: dict[str, int] = {
+    "scan": 900,      # dựng image + OpenGrep + ZAP spider và passive scan
+    "normalize": 120,
+    "analyze": 1200,  # gọi LLM theo nhóm, có thử lại
+    "propose": 120,
+    "probe": 180,
+    "scrub": 120,
+    "report": 120,
+    "finalize": 120,
+}
+# `approval` cố ý vắng mặt: chờ người vận hành bấm nút KHÔNG phải là treo, và
+# không có ngưỡng nào đúng cho việc một con người rời bàn đi pha cà phê.
+
 _TERMINAL = frozenset({"DONE", "REJECTED", "FAILED"})
 
 

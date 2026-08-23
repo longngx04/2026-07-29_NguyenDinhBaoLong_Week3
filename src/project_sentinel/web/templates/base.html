@@ -7,27 +7,29 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
-    <div class="brand-wrapper">
-      <div class="brand-icon">S</div>
-      <a class="brand" href="/">Project&nbsp;Sentinel</a>
-    </div>
-    <nav>
-      {% if run %}
-      <a href="/runs/{{ run.run_id }}">Tiến trình</a>
-      <a href="/runs/{{ run.run_id }}/findings">Cảnh báo</a>
-      <a href="/runs/{{ run.run_id }}/analysis">Phân tích</a>
-      <a href="/approvals">Phê duyệt</a>
-      <a href="/runs/{{ run.run_id }}/events">Sự kiện bảo mật</a>
-      <a href="/runs/{{ run.run_id }}/requests">Nhật ký Gateway</a>
-      {% else %}
-      <a href="/">Tổng quan</a>
-      <a href="/approvals">Hàng chờ duyệt</a>
-      {% endif %}
+  <header class="commandbar">
+    <a class="mark" href="/">
+      <span class="mark-glyph" aria-hidden="true"></span>
+      <span>SENTINEL</span>
+      <span class="mark-sub">SAST · DAST · triage</span>
+    </a>
+
+    <nav class="cmdnav" aria-label="Điều hướng chính">
+      <a href="/" {% if nav == 'console' %}aria-current="page"{% endif %}>Bảng điều khiển</a>
+      <a href="/history" {% if nav == 'history' %}aria-current="page"{% endif %}>Lịch sử chạy</a>
+      <a href="/approvals" {% if nav == 'approvals' %}aria-current="page"{% endif %}>Hàng chờ duyệt<span id="gate-count"></span></a>
     </nav>
+
+    <form method="post" action="/runs">
+      <button type="submit" class="btn btn-run">▶ Chạy quét</button>
+    </form>
   </header>
-  <main>
+
+  <main class="shell">
     {% block content %}{% endblock %}
   </main>
+
+  <script src="/static/sentinel.js"></script>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -51,8 +51,14 @@ def _check_origin(request: Request) -> None:
 
 
 @app.get("/", response_class=HTMLResponse)
-def overview(request: Request, ctx: RunContext = Depends(get_context)):
-    return _render(request, "overview.html", views.overview_data(ctx))
+def console(request: Request, ctx: RunContext = Depends(get_context)):
+    """Bảng điều khiển: một lần chạy, một trang, không phải bấm đi đâu."""
+    return _render(request, "console.html", views.console_data(ctx))
+
+
+@app.get("/history", response_class=HTMLResponse)
+def history(request: Request, ctx: RunContext = Depends(get_context)):
+    return _render(request, "history.html", views.history_data(ctx))
 
 
 @app.post("/runs")
@@ -65,7 +71,9 @@ def start_new_run(request: Request, background: BackgroundTasks, ctx: RunContext
 
 @app.get("/runs/{run_id}", response_class=HTMLResponse)
 def run_screen(request: Request, run_id: str, ctx: RunContext = Depends(get_context)):
-    return _render(request, "run.html", _load_or_404(views.run_data, ctx, run_id))
+    """Cùng bảng điều khiển, ghim vào một lần chạy cụ thể."""
+    _load_or_404(views.run_data, ctx, run_id)
+    return _render(request, "console.html", views.console_data(ctx, run_id))
 
 
 @app.get("/api/runs/{run_id}")

@@ -1,0 +1,109 @@
+{# Báo cáo agent: phân loại, giải thích, khắc phục, và tri thức đã trích dẫn. #}
+{% if not records %}
+<div class="empty">
+  <p class="empty-title">Agent chưa sinh báo cáo nào</p>
+  <p class="prose">Bước <code>analyze</code> chưa chạy xong, hoặc không có nhóm nào hợp lệ.</p>
+</div>
+{% endif %}
+
+{% for item in records %}
+<article class="card">
+  <div class="card-head">
+    <p class="card-title">{{ item.title }}</p>
+    <span class="tag sev-{{ item.severity }}">{{ item.severity }}</span>
+  </div>
+
+  <p class="hint">
+    tin cậy <strong>{{ item.confidence|upper }}</strong>
+    {%- if item.reachability %} · chạm tới <strong>{{ item.reachability }}</strong>
+      {%- if item.calibration and 'reachability_measured' in (item.calibration.rules or []) %}
+      <span class="tag" data-tone="ok" title="Giá trị này do Python ĐO từ đối chiếu route với access log của Gateway, và đã ghi đè giá trị agent tự khai">đo từ DAST</span>
+      {%- endif -%}
+    {%- endif -%}
+    {%- if item.attacker_control %} · kẻ tấn công kiểm soát đầu vào <strong>{{ item.attacker_control }}</strong>{% endif %}
+  </p>
+
+  <p class="hint">
+    {% for loc in item.locations %}
+      {% if loc.url %}<code>{{ loc.url }}</code>{% else %}<code>{{ loc.file }}:{{ loc.line }}</code>{% endif %}{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </p>
+
+  <div class="block">
+    <h3>Giải thích</h3>
+    <p class="quote">{{ item.explanation }}</p>
+  </div>
+
+  <div class="block">
+    <h3>Khuyến nghị khắc phục</h3>
+    <ul>
+      {% for fix in item.remediation %}<li>{{ fix }}</li>{% endfor %}
+    </ul>
+  </div>
+
+  <div class="block">
+    <h3>Bằng chứng từ công cụ quét</h3>
+    <pre><code>{% for ev in item.evidence %}{{ ev.content }}
+{% endfor %}</code></pre>
+  </div>
+
+  {% if item.knowledge_details %}
+  <div class="block">
+    <h3>Tri thức đã trích dẫn</h3>
+    {% for kb in item.knowledge_details %}
+    <div class="kbdoc">
+      <div class="kbdoc-head">
+        <strong>{{ kb.title }}</strong>
+        {% if kb.score %}<span class="tag">khớp {{ kb.score }}%</span>{% endif %}
+      </div>
+      {% if kb.id %}<p class="hint">{{ kb.id }}</p>{% endif %}
+
+      {% if kb.safe_alternative %}
+      <p><span class="hint">Thay bằng</span> <code>{{ kb.safe_alternative }}</code></p>
+      {% endif %}
+
+      {% if kb.not_exploitable_when %}
+      <p class="safe"><strong>Không khai thác được khi:</strong> {{ kb.not_exploitable_when }}</p>
+      {% endif %}
+
+      {% if kb.references %}
+      <div class="reflinks">
+        {% for ref_url in kb.references %}
+        <a class="reflink" href="{{ ref_url }}" target="_blank" rel="noopener noreferrer">↗ {{ ref_url }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</article>
+{% endfor %}
+
+<div class="block">
+  <p class="eyebrow">Đề xuất kiểm chứng</p>
+  {% if proposal.accepted %}
+  <article class="card" data-tone="ok">
+    <div class="card-head">
+      <p class="card-title">Đề xuất nằm trong allowlist</p>
+      <span class="tag" data-tone="ok">accepted</span>
+    </div>
+    <p><span class="tag">{{ proposal.probe.method }}</span> <code>{{ proposal.probe.path }}</code></p>
+    <p class="prose">Payload <code>{{ proposal.probe.payload_kind or "không có" }}</code> — {{ proposal.reason }}</p>
+  </article>
+  {% elif proposal %}
+  <article class="card" data-tone="bad">
+    <div class="card-head">
+      <p class="card-title">Đề xuất bị chặn</p>
+      <span class="tag" data-tone="bad">blocked</span>
+    </div>
+    <p class="prose">{{ proposal.reason }}</p>
+    {% if proposal.objective %}
+    <p class="hint">Agent đã đề xuất <code>{{ proposal.objective.endpoint_hint }}</code></p>
+    {% endif %}
+    <p class="prose">Allowlist deny-by-default đã giữ request lại trước khi nó rời khỏi tiến trình.</p>
+  </article>
+  {% else %}
+  <p class="prose">Chưa có đề xuất nào.</p>
+  {% endif %}
+</div>

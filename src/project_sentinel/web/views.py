@@ -6,20 +6,28 @@ nào. Mọi thay đổi đều thuộc về orchestrator.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from project_sentinel.guardrails.events import read_events
 from project_sentinel.orchestrator.context import RunContext
 from project_sentinel.orchestrator.metrics import collect_metrics
-from project_sentinel.orchestrator.run_log import read_log
-from project_sentinel.orchestrator.state import RunRecord, list_runs, load_run
+from project_sentinel.orchestrator.run_log import LOG_FILENAME, read_log
+from project_sentinel.orchestrator.state import (
+    DEFAULT_STEP_BUDGET_S,
+    STEP_BUDGET_S,
+    RunRecord,
+    list_runs,
+    load_run,
+)
 from project_sentinel.retrieval.kb_schema import parse_tier2
 import yaml
 
-MAX_RUNS_ON_OVERVIEW = 20
+MAX_RUNS_ON_HISTORY = 20
 
 
 def _read_json(path: Path, default: Any) -> Any:
@@ -56,12 +64,12 @@ def _read_jsonl(path: Path) -> list[dict]:
     return results
 
 
-def overview_data(ctx: RunContext) -> dict:
-    """Số liệu tổng hợp và danh sách các lần chạy gần đây."""
+def history_data(ctx: RunContext) -> dict:
+    """Số liệu cộng dồn và danh sách các lần chạy, cho trang Lịch sử."""
     rows = []
     totals = {"runs": 0, "findings": 0, "requests": 0, "approved": 0, "rejected": 0, "errors": 0}
 
-    for run_id in list_runs(ctx.runs_dir)[:MAX_RUNS_ON_OVERVIEW]:
+    for run_id in list_runs(ctx.runs_dir)[:MAX_RUNS_ON_HISTORY]:
         try:
             record = load_run(ctx.runs_dir, run_id)
             metrics = collect_metrics(record)
@@ -79,6 +87,11 @@ def overview_data(ctx: RunContext) -> dict:
         totals["findings"] += metrics["findings_total"]
         totals["requests"] += metrics["requests_total"]
         totals["approved"] += metrics["approvals"]["approved"]
+        # `rejected` và `errors` được khai báo trong `totals` từ đầu nhưng chưa
+        # bao giờ được cộng, nên hai ô đó luôn hiện 0 kể cả khi có lần chạy bị
+        # từ chối hoặc bị lỗi. Cả hai đều nằm trong năm số liệu bắt buộc.
+        totals["rejected"] += metrics["approvals"]["rejected"]
+        totals["errors"] += metrics["errors"]["total"]
     has_active = any(
         row["state"] not in {"DONE", "FAILED", "REJECTED"}
         for row in rows
@@ -334,13 +347,53 @@ def approvals_data(ctx: RunContext) -> dict:
     return {"pending": pending}
 
 
+def _run_liveness(record: RunRecord) -> dict[str, Any]:
+    """Lần chạy còn sống hay đã treo, theo ngân sách riêng của bước đang chạy.
+
+    Dấu hiệu sống là mốc muộn hơn giữa hai thứ: `updated_at` trong state.json
+    (đổi mỗi khi một bước chuyển trạng thái) và thời điểm sửa file nhật ký (đổi
+    mỗi khi một bước ghi thêm một dòng). Chỉ nhìn `updated_at` là không đủ —
+    một bước dài vẫn ghi log giữa chừng mà chưa đổi trạng thái.
+
+    `AWAITING_APPROVAL` không bao giờ bị coi là treo: pipeline dừng ở đó là
+    đúng thiết kế, nó đang đợi một con người.
+    """
+    running = next((s for s in record.steps if s.status == "running"), None)
+    budget = (
+        STEP_BUDGET_S.get(running.name, DEFAULT_STEP_BUDGET_S)
+        if running
+        else DEFAULT_STEP_BUDGET_S
+    )
+
+    marks: list[float] = []
+    with contextlib.suppress(TypeError, ValueError):
+        marks.append(datetime.fromisoformat(record.updated_at).timestamp())
+    with contextlib.suppress(OSError):
+        marks.append((record.root / LOG_FILENAME).stat().st_mtime)
+
+    now = datetime.now(timezone.utc).timestamp()
+    idle = max(0.0, now - max(marks)) if marks else 0.0
+    waiting_for_human = record.state.value == "AWAITING_APPROVAL"
+
+    return {
+        "running_step": running.name if running else None,
+        "running_step_index": running.index if running else None,
+        "idle_seconds": round(idle, 1),
+        "stall_budget_s": budget,
+        "stalled": (
+            not record.state.is_terminal() and not waiting_for_human and idle > budget
+        ),
+        "waiting_for_human": waiting_for_human,
+    }
+
+
 def run_status(ctx: RunContext, run_id: str) -> dict:
     """Dữ liệu thời gian thực phục vụ polling / live updates."""
     record: RunRecord = load_run(ctx.runs_dir, run_id)
-    logs = read_log(record.root)[-100:]
+    entries = read_log(record.root)[-200:]
     log_text = "\n".join(
         f"[{entry.get('level', 'info').upper()}] {entry.get('step', 'system')}: {entry.get('message', '')}"
-        for entry in logs
+        for entry in entries
     )
     metrics = collect_metrics(record)
     return {
@@ -349,11 +402,23 @@ def run_status(ctx: RunContext, run_id: str) -> dict:
         "error": record.error,
         "terminal": record.state.is_terminal(),
         "awaiting_approval": record.state.value == "AWAITING_APPROVAL",
+        "updated_at": record.updated_at,
         "steps": [
             {"index": s.index, "name": s.name, "status": s.status, "elapsed_ms": s.elapsed_ms}
             for s in record.steps
         ],
         "log": log_text,
+        # Nhật ký có cấu trúc: terminal tô màu theo `level`, việc mà một khối
+        # văn bản phẳng không làm được.
+        "log_lines": [
+            {
+                "ts": str(entry.get("ts") or ""),
+                "step": str(entry.get("step") or "system"),
+                "level": str(entry.get("level") or "info"),
+                "message": str(entry.get("message") or ""),
+            }
+            for entry in entries
+        ],
         "metrics": {
             "findings_total": metrics["findings_total"],
             "requests_total": metrics["requests_total"],
@@ -361,4 +426,57 @@ def run_status(ctx: RunContext, run_id: str) -> dict:
             "approvals_rejected": metrics["approvals"]["rejected"],
             "total_elapsed_ms": metrics["total_elapsed_ms"],
         },
+        **_run_liveness(record),
     }
+
+
+def _first_loadable_run(ctx: RunContext, preferred: str | None) -> RunRecord | None:
+    """Lần chạy để hiển thị: ưu tiên `preferred`, nếu hỏng thì lùi về lần kế.
+
+    Một `state.json` hỏng KHÔNG được làm trắng cả bảng điều khiển. Bảng điều
+    khiển giờ là trang chủ, nên lỗi ở đây là lỗi ở lối vào duy nhất.
+    """
+    candidates: list[str] = []
+    if preferred:
+        candidates.append(preferred)
+    candidates.extend(rid for rid in list_runs(ctx.runs_dir) if rid != preferred)
+
+    for run_id in candidates:
+        try:
+            return load_run(ctx.runs_dir, run_id)
+        except Exception:
+            continue
+    return None
+
+
+def console_data(ctx: RunContext, run_id: str | None = None) -> dict:
+    """Toàn bộ một lần chạy trên MỘT trang: tiến trình, nhật ký, bằng chứng.
+
+    Khi không chỉ định `run_id`, chọn lần chạy được ghim cho demo, nếu không có
+    thì lần chạy mới nhất. Người xem không phải bấm qua trang nào để thấy trạng
+    thái hiện tại.
+    """
+    demo_run = os.getenv("SENTINEL_DEMO_RUN") or None
+    record = _first_loadable_run(ctx, run_id or demo_run)
+
+    if record is None:
+        return {
+            "run": None,
+            "demo_run": demo_run,
+            "run_count": 0,
+            "pinned": False,
+        }
+
+    data = run_data(ctx, record.run_id)
+    data.update(findings_data(ctx, record.run_id))
+    data.update(analysis_data(ctx, record.run_id))
+    data.update(events_data(ctx, record.run_id))
+    data.update(requests_data(ctx, record.run_id))
+    data["liveness"] = _run_liveness(record)
+    data["approval_request"] = _read_json(
+        record.root / "approval-request.json", None
+    )
+    data["demo_run"] = demo_run
+    data["pinned"] = bool(demo_run and demo_run == record.run_id)
+    data["run_count"] = len(list_runs(ctx.runs_dir))
+    return data

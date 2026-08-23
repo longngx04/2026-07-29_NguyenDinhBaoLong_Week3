@@ -1,0 +1,95 @@
+{# Cảnh báo thô từ hai công cụ quét, trước khi agent nhóm và phân tích. #}
+{# Hai cách chia KHÁC NHAU trên cùng một tập cảnh báo. Trộn chúng vào một hàng
+   ô số làm người đọc tưởng đang cộng dồn, trong khi mỗi nhóm đã là 100%. #}
+{% if severities %}
+<div class="block">
+  <p class="eyebrow">Theo mức độ</p>
+  <div class="readouts">
+    {% for name, count in severities.items() %}
+    <div class="readout">
+      <span class="num sev-{{ name }}">{{ count }}</span>
+      <span class="lbl">{{ name }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if by_tool %}
+<div class="block">
+  <p class="eyebrow">Theo công cụ quét</p>
+  <div class="readouts">
+    {% for name, count in by_tool.items() %}
+    <div class="readout">
+      <span class="num">{{ count }}</span>
+      <span class="lbl">{{ name }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if by_tool.zap %}
+<p class="prose">
+  Hai con số không cùng đơn vị: một cảnh báo ZAP gộp theo <em>loại</em> alert và
+  có thể trải trên nhiều URL, còn một cảnh báo OpenGrep là một vị trí trong mã.
+</p>
+{% endif %}
+
+{% if not findings %}
+<div class="empty">
+  <p class="empty-title">Không có cảnh báo nào</p>
+  <p class="prose">Lần chạy này không ghi được cảnh báo nào từ công cụ quét.</p>
+</div>
+{% else %}
+<div class="tablewrap">
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Mức độ</th>
+        <th scope="col">Lỗ hổng</th>
+        <th scope="col">Vị trí</th>
+        <th scope="col">Công cụ</th>
+        <th scope="col">Chạm tới được?</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in findings %}
+      <tr>
+        <td><span class="tag sev-{{ item.severity }}">{{ item.severity }}</span></td>
+        <td>{{ item.title }}</td>
+        <td><code>{{ item.file_or_url }}{% if item.line %}:{{ item.line }}{% endif %}</code></td>
+        <td class="faint">{{ item.tool }}</td>
+        <td class="dim">
+          {%- if item.tool == 'zap' -%}
+            <span title="Cảnh báo động tự nó đã là bằng chứng runtime">—</span>
+          {%- elif item.runtime_evidence and item.runtime_evidence.strength -%}
+            {{ item.runtime_evidence.strength }}
+          {%- else -%}
+            <span title="Lần chạy này không có DAST">—</span>
+          {%- endif -%}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if strengths %}
+<div class="block">
+  <p class="eyebrow">Đối chiếu tĩnh ↔ động</p>
+  <div class="readouts">
+    {% for name, count in strengths.items() %}
+    <div class="readout" {% if name == 'reachable' %}data-tone="live"{% endif %}>
+      <span class="num">{{ count }}</span>
+      <span class="lbl">{{ name }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="prose">
+    <code>reachable</code> nghĩa là endpoint tồn tại và ZAP chạm tới được —
+    <strong>không</strong> nghĩa là lỗ hổng đã được chứng minh.
+  </p>
+</div>
+{% endif %}

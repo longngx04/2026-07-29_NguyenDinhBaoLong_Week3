@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% set nav = 'console' %}
+{% block title %}{% if run %}{{ run.run_id }} — {% endif %}Bảng điều khiển — Project Sentinel{% endblock %}
+{% block content %}
+
+{% if not run %}
+
+<div class="empty">
+  <p class="empty-title">Chưa có lần chạy nào.</p>
+  <p class="prose">
+    Bấm <strong>▶ Chạy quét</strong> ở thanh trên. Pipeline sẽ quét mã nguồn bằng
+    OpenGrep, quét ứng dụng đang chạy bằng ZAP qua Gateway, rồi để agent phân
+    loại kết quả. Toàn bộ chín bước hiện ngay trên trang này.
+  </p>
+</div>
+
+{% else %}
+
+{% set state = run.state.value %}
+{% set tone = 'ok' if state == 'DONE' else ('bad' if state in ('FAILED', 'REJECTED') else 'live') %}
+
+<div id="console"
+     data-run-id="{{ run.run_id }}"
+     data-terminal="{{ 'true' if run.state.is_terminal() else 'false' }}"
+     data-stalled="{{ 'true' if liveness.stalled else 'false' }}"></div>
+
+{% if pinned %}
+<div class="notice" data-tone="live">
+  <span class="notice-glyph" aria-hidden="true">◈</span>
+  <div>Chế độ demo — lần chạy này được ghim bằng <code>SENTINEL_DEMO_RUN</code>.</div>
+</div>
+{% endif %}
+
+<div class="runhead">
+  <div class="runhead-id">
+    <p class="eyebrow">Lần chạy</p>
+    <p class="runid">{{ run.run_id }}</p>
+    <a class="hint" href="/runs/{{ run.run_id }}">/runs/{{ run.run_id }} — đường dẫn cố định</a>
+  </div>
+  <div class="runhead-meta">
+    <span class="lamp" id="lamp" data-tone="{{ tone }}">{{ state }}</span>
+    <span class="lamp" id="idle-meter" {% if run.state.is_terminal() or liveness.waiting_for_human %}hidden{% endif %}>
+      im lặng <span id="idle-value">{{ liveness.idle_seconds|round|int }}</span>s
+      / ngưỡng <span id="idle-budget">{{ liveness.stall_budget_s }}</span>s
+    </span>
+    <span>
+      <span class="clock" id="clock">{{ (metrics.total_elapsed_ms / 1000) | round(1) }}</span>
+      <span class="clock-unit">giây · tổng các bước đã xong</span>
+    </span>
+  </div>
+</div>
+
+{# Chỗ dành cho cảnh báo treo — JS ghi vào đây khi không còn thấy tiến triển. #}
+<div id="stall-slot"></div>
+
+<div id="error-slot">
+  {% if run.error %}
+  <div class="notice" data-tone="bad">
+    <span class="notice-glyph" aria-hidden="true">✕</span>
+    <div><strong>Lần chạy hỏng:</strong> {{ run.error }}</div>
+  </div>
+  {% endif %}
+</div>
+
+{% if analysis_summary.completeness == 'PARTIAL' %}
+<div class="notice" data-tone="live">
+  <span class="notice-glyph" aria-hidden="true">!</span>
+  <div>
+    <strong>Phân tích không trọn vẹn — PARTIAL.</strong>
+    {{ analysis_summary.output_record_count }}/{{ analysis_summary.group_count }}
+    nhóm sinh được record. Những cảnh báo thuộc các nhóm còn lại
+    <strong>không có mặt</strong> trong báo cáo.
+    {% if analysis_summary.unresolved_group_reasons %}
+    <ul>
+      {% for group_key, reasons in analysis_summary.unresolved_group_reasons.items() %}
+      <li><code>{{ group_key }}</code> — {{ reasons | join('; ') }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="block">
+  <p class="eyebrow">Tiến trình chín bước</p>
+  <div class="railwrap" id="railwrap">
+    <ol class="rail" id="rail">
+      {% for step in steps %}
+      <li class="station" data-step="{{ step.name }}"
+          data-status="{{ 'waiting' if state == 'AWAITING_APPROVAL' and step.name == 'approval' else step.status }}">
+        <span class="wire" aria-hidden="true"></span>
+        <span class="node">{{ step.index }}</span>
+        <span class="station-name">{{ step.name }}</span>
+        <span class="station-time">{% if step.elapsed_ms %}{{ (step.elapsed_ms / 1000) | round(1) }}s{% endif %}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>
+
+{# Cổng phê duyệt xuất hiện ngay tại chỗ. Người xem không phải rời trang. #}
+<div id="gate-slot">
+  {% if state == 'AWAITING_APPROVAL' and approval_request %}
+    {% set gate_run_id = run.run_id %}
+    {% set gate_request = approval_request %}
+    {% include "partials/_gate.html" %}
+  {% endif %}
+</div>
+
+<div class="block">
+  <p class="eyebrow">Số liệu</p>
+  <div class="readouts">
+    <div class="readout">
+      <span class="num" id="m-findings">{{ metrics.findings_total }}</span>
+      <span class="lbl">cảnh báo</span>
+    </div>
+    <div class="readout">
+      <span class="num" id="m-requests">{{ metrics.requests_total }}</span>
+      <span class="lbl">request</span>
+    </div>
+    <div class="readout" data-tone="ok">
+      <span class="num" id="m-approved">{{ metrics.approvals.approved }}</span>
+      <span class="lbl">đã duyệt</span>
+    </div>
+    <div class="readout" {% if metrics.approvals.rejected %}data-tone="bad"{% endif %}>
+      <span class="num" id="m-rejected">{{ metrics.approvals.rejected }}</span>
+      <span class="lbl">đã từ chối</span>
+    </div>
+    <div class="readout" {% if metrics.errors.total %}data-tone="bad"{% endif %}>
+      <span class="num">{{ metrics.errors.total }}</span>
+      <span class="lbl">lỗi</span>
+    </div>
+    {% if metrics.dast.alerts_total %}
+    <div class="readout">
+      <span class="num">{{ metrics.dast.endpoints_discovered }}</span>
+      <span class="lbl">endpoint chạm tới</span>
+    </div>
+    <div class="readout">
+      <span class="num">{{ metrics.dast.instances_total }}</span>
+      <span class="lbl">vị trí động</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="block">
+  <p class="eyebrow">Nhật ký thực thi</p>
+  <div class="terminal">
+    <div class="terminal-bar">
+      <span>run.log.jsonl</span>
+      <span class="spacer"></span>
+      <label class="toggle">
+        <input type="checkbox" id="autoscroll" checked> tự cuộn
+      </label>
+    </div>
+    <div class="terminal-body" id="terminal-body" role="log" aria-live="polite" aria-label="Nhật ký thực thi">
+      {% if not log %}
+      <p class="terminal-empty">Chưa có dòng nhật ký nào.</p>
+      {% endif %}
+      {% for entry in log %}
+      <div class="tline" data-level="{{ entry.level }}">
+        <span class="tline-step">{{ entry.step }}</span>
+        <span class="tline-msg">{{ entry.message }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="block">
+  <p class="eyebrow">Bằng chứng</p>
+  <div class="tabs" role="tablist" aria-label="Bằng chứng của lần chạy">
+    <button class="tab" role="tab" id="tab-findings" aria-controls="panel-findings" aria-selected="true">
+      Cảnh báo <span class="tab-count">{{ findings|length }}</span>
+    </button>
+    <button class="tab" role="tab" id="tab-analysis" aria-controls="panel-analysis" aria-selected="false">
+      Phân tích <span class="tab-count">{{ records|length }}</span>
+    </button>
+    <button class="tab" role="tab" id="tab-events" aria-controls="panel-events" aria-selected="false">
+      Sự kiện bảo mật <span class="tab-count">{{ events|length }}</span>
+    </button>
+    <button class="tab" role="tab" id="tab-requests" aria-controls="panel-requests" aria-selected="false">
+      Gateway <span class="tab-count">{{ requests|length }}</span>
+    </button>
+  </div>
+
+  <div class="panel" role="tabpanel" id="panel-findings" aria-labelledby="tab-findings">
+    {% include "partials/_findings.html" %}
+  </div>
+  <div class="panel" role="tabpanel" id="panel-analysis" aria-labelledby="tab-analysis" hidden>
+    {% include "partials/_analysis.html" %}
+  </div>
+  <div class="panel" role="tabpanel" id="panel-events" aria-labelledby="tab-events" hidden>
+    {% include "partials/_events.html" %}
+  </div>
+  <div class="panel" role="tabpanel" id="panel-requests" aria-labelledby="tab-requests" hidden>
+    {% include "partials/_requests.html" %}
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

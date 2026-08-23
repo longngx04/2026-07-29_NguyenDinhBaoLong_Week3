@@ -1,0 +1,75 @@
+{# Can thiệp an toàn đã ghi được: chặn injection, che PII, chặn ngoài allowlist. #}
+{% if not events %}
+<div class="empty">
+  <p class="empty-title">Không ghi nhận sự kiện nào</p>
+  <p class="prose">Không có can thiệp an toàn nào xảy ra trong lần chạy này.</p>
+</div>
+{% else %}
+
+{% if scrubbed.injection and scrubbed.injection.verdict == "suspicious" %}
+<article class="card" data-tone="bad">
+  <div class="card-head">
+    <p class="card-title">Prompt injection bị chặn</p>
+    <span class="tag" data-tone="bad">injection</span>
+  </div>
+  <p class="prose">
+    Response từ ứng dụng đích chứa nội dung cố điều khiển hành vi của agent.
+    Phần đó bị cắt bỏ trước khi chạm vào prompt.
+  </p>
+  <div class="block">
+    <h3>Đoạn bị phát hiện</h3>
+    <pre><code>{% for m in scrubbed.injection.matches %}[{{ m.pattern_name }}] {{ m.excerpt }}
+{% endfor %}</code></pre>
+  </div>
+  <div class="block">
+    <h3>Nội dung thực sự đưa vào LLM</h3>
+    <pre><code>{{ scrubbed.safe_text }}</code></pre>
+  </div>
+</article>
+{% endif %}
+
+{% if scrubbed.redactions %}
+<article class="card">
+  <div class="card-head">
+    <p class="card-title">Dữ liệu nhạy cảm đã che</p>
+    <span class="tag">redaction</span>
+  </div>
+  <ul>
+    {% for r in scrubbed.redactions %}<li><code>{{ r.kind }}</code> × <strong>{{ r.count }}</strong></li>{% endfor %}
+  </ul>
+</article>
+{% endif %}
+
+{% if proposal and not proposal.accepted and proposal.objective %}
+<article class="card" data-tone="bad">
+  <div class="card-head">
+    <p class="card-title">Đề xuất ngoài allowlist bị chặn</p>
+    <span class="tag" data-tone="bad">allowlist</span>
+  </div>
+  <p class="prose">Agent đề xuất <code>{{ proposal.objective.endpoint_hint }}</code> — {{ proposal.reason }}</p>
+</article>
+{% endif %}
+
+<div class="tablewrap">
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Thời điểm</th>
+        <th scope="col">Loại</th>
+        <th scope="col">Chi tiết</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for event in events %}
+      <tr>
+        <td class="faint num-cell"><code>{{ event.ts }}</code></td>
+        <td>
+          <span class="tag" data-tone="{% if event.kind in ('injection', 'allowlist_block') %}bad{% elif event.kind == 'redaction' %}live{% else %}ok{% endif %}">{{ event.kind }}</span>
+        </td>
+        <td><code>{{ event.detail }}</code></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

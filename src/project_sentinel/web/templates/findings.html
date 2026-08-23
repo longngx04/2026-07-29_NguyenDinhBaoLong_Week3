@@ -1,84 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Cảnh báo — {{ run.run_id }} — Project Sentinel{% endblock %}
 {% block content %}
-
-<div class="page-header">
-  <div class="page-title-group">
-    <h1>Cảnh báo từ công cụ quét</h1>
-    <p class="muted">Cảnh báo thô từ OpenGrep (quét mã tĩnh) và ZAP (quét động qua Gateway), trước khi được nhóm và phân tích</p>
+<div class="pagehead">
+  <div class="block">
+    <p class="eyebrow">{{ run.run_id }}</p>
+    <h1 class="pagetitle">Cảnh báo từ công cụ quét</h1>
+    <p class="prose">Kết quả thô của OpenGrep và ZAP, trước khi agent nhóm và phân loại.</p>
   </div>
-  <div>
-    <a href="/runs/{{ run.run_id }}" class="btn">← Quay lại tiến trình</a>
-    <a href="/runs/{{ run.run_id }}/analysis" class="btn primary">Xem báo cáo AI →</a>
-  </div>
+  <a class="btn" href="/runs/{{ run.run_id }}">← Về bảng điều khiển</a>
 </div>
-
-<section class="tiles" aria-label="Phân bố mức độ nghiêm trọng">
-  {% for name, count in severities.items() %}
-  <div class="tile">
-    <span class="num sev-{{ name }}">{{ count }}</span>
-    <span class="lbl">{{ name }}</span>
-  </div>
-  {% endfor %}
-</section>
-
-{% if by_tool %}
-<section class="tiles" aria-label="Phân bố theo công cụ quét">
-  {% for name, count in by_tool.items() %}
-  <div class="tile">
-    <span class="num">{{ count }}</span>
-    <span class="lbl">{{ name }}</span>
-  </div>
-  {% endfor %}
-</section>
-{% if by_tool.zap %}
-<p class="muted" style="margin-top: 0.25rem;">
-  Một cảnh báo ZAP gộp theo <em>loại</em> alert và có thể trải trên nhiều URL;
-  một cảnh báo OpenGrep là một vị trí trong mã. Hai con số không cùng đơn vị.
-</p>
-{% endif %}
-{% endif %}
-
-{% if not findings %}
-<div class="empty-state">
-  <p class="muted">Không có cảnh báo nào trong lần chạy này.</p>
-</div>
-{% else %}
-<h2>Danh sách cảnh báo phát hiện ({{ findings|length }})</h2>
-<div class="table-container">
-  <table>
-    <thead>
-      <tr>
-        <th>Mức độ</th>
-        <th>Tiêu đề lỗ hổng</th>
-        <th>Vị trí</th>
-        <th>Công cụ quét</th>
-        <th>Chạm tới được?</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for item in findings %}
-      <tr>
-        <td>
-          <span class="badge-sev sev-{{ item.severity }}">{{ item.severity }}</span>
-        </td>
-        <td><strong>{{ item.title }}</strong></td>
-        <td><code>{{ item.file_or_url }}{% if item.line %}:{{ item.line }}{% endif %}</code></td>
-        <td class="muted">{{ item.tool }}</td>
-        <td class="muted">
-          {%- if item.tool == 'zap' -%}
-            <span title="Finding động đã là bằng chứng runtime">—</span>
-          {%- elif item.runtime_evidence and item.runtime_evidence.strength -%}
-            {{ item.runtime_evidence.strength }}
-          {%- else -%}
-            <span title="Lần chạy này không có DAST">—</span>
-          {%- endif -%}
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
-
+{% include "partials/_findings.html" %}
 {% endblock %}

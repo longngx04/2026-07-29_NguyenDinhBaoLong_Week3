@@ -1,598 +1,79 @@
+/* Project Sentinel — bảng điều khiển vận hành.
+ *
+ * Bảng màu có MỘT quy tắc, và mọi thứ khác đi theo nó:
+ *   hổ phách = đang có thứ gì đó chuyển động, hoặc đang đợi một con người
+ *   ngọc     = đã xong và đã đo được
+ *   san hô   = đã chặn, đã hỏng, đã từ chối
+ * Không màu nào được dùng để trang trí. Nhìn màu là biết trạng thái.
+ *
+ * Không tải font từ ngoài: phòng demo có thể mất mạng, và có một test chặn
+ * mọi tham chiếu tới host bên ngoài. Chữ đơn cách (mono) là giọng chính của
+ * giao diện vì gần như mọi thứ trên màn hình đều là văn bản máy sinh ra —
+ * run ID, đường dẫn, mã HTTP, tên bước. Chữ thường chỉ dùng cho văn xuôi.
+ */
+
 :root {
-  --bg: #0f172a;
-  --bg-surface: #1e293b;
-  --bg-surface-hover: #334155;
-  --bg-elevated: #283548;
-  --fg: #f8fafc;
-  --fg-muted: #94a3b8;
-  --fg-subtle: #64748b;
-  --line: #334155;
-  --line-strong: #475569;
-  --accent: #38bdf8;
-  --accent-hover: #0ea5e9;
-  --accent-bg: rgba(56, 189, 248, 0.12);
-  --ok: #22c55e;
-  --ok-bg: rgba(34, 197, 94, 0.12);
-  --warn: #eab308;
-  --warn-bg: rgba(234, 179, 8, 0.12);
-  --bad: #ef4444;
-  --bad-bg: rgba(239, 68, 68, 0.14);
-  --card: #1e293b;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --ink: #0b0e17;
+  --panel: #131826;
+  --panel-2: #1b2233;
+  --panel-3: #222b40;
+  --rail: #2a3348;
+  --rail-soft: #202940;
+
+  --paper: #e6e9f2;
+  --paper-dim: #8d97ae;
+  --paper-faint: #5c6684;
+
+  --signal: #ffae3d;
+  --signal-soft: rgba(255, 174, 61, 0.14);
+  --signal-line: rgba(255, 174, 61, 0.42);
+
+  --verified: #5ad1c0;
+  --verified-soft: rgba(90, 209, 192, 0.13);
+  --verified-line: rgba(90, 209, 192, 0.4);
+
+  --halt: #ff6b84;
+  --halt-soft: rgba(255, 107, 132, 0.13);
+  --halt-line: rgba(255, 107, 132, 0.4);
+
+  --pending: #3a4460;
+
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", "Fira Code",
+    Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+
+  --r-sm: 3px;
+  --r-md: 6px;
+  --r-lg: 10px;
+
+  --shell: 1180px;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f8fafc;
-    --bg-surface: #ffffff;
-    --bg-surface-hover: #f1f5f9;
-    --bg-elevated: #ffffff;
-    --fg: #0f172a;
-    --fg-muted: #475569;
-    --fg-subtle: #94a3b8;
-    --line: #e2e8f0;
-    --line-strong: #cbd5e1;
-    --accent: #0284c7;
-    --accent-hover: #0369a1;
-    --accent-bg: rgba(2, 132, 199, 0.08);
-    --ok: #16a34a;
-    --ok-bg: rgba(22, 163, 74, 0.08);
-    --warn: #d97706;
-    --warn-bg: rgba(217, 119, 6, 0.08);
-    --bad: #dc2626;
-    --bad-bg: rgba(220, 38, 38, 0.08);
-    --card: #ffffff;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
-  }
-}
-
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-sans);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--sans);
   font-size: 15px;
   line-height: 1.6;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Header & Navigation */
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  padding: 0.85rem 2rem;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--line);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: var(--shadow-sm);
-}
-
-.brand-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.brand-icon {
-  width: 28px;
-  height: 28px;
-  background: var(--accent);
-  color: #0f172a;
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  font-size: 14px;
-}
-
-.brand {
-  font-weight: 700;
-  font-size: 1.15rem;
-  text-decoration: none;
-  color: var(--fg);
-  letter-spacing: -0.02em;
-}
-
-.brand:hover {
-  color: var(--accent);
-}
-
-nav {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-nav a {
-  color: var(--fg-muted);
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.9rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: var(--radius-sm);
-  transition: all 0.15s ease-in-out;
-}
-
-nav a:hover {
-  color: var(--fg);
-  background: var(--bg-surface-hover);
-}
-
-nav a.active {
-  color: var(--accent);
-  background: var(--accent-bg);
-  font-weight: 600;
-}
-
-/* Layout Container */
-main {
-  max-width: 1180px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 2rem 1.5rem 4rem;
-  flex: 1;
-}
-
-/* Typography */
-h1 {
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  margin-bottom: 0.5rem;
-  color: var(--fg);
-}
-
-h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  margin-top: 2rem;
-  margin-bottom: 0.75rem;
-  color: var(--fg);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-h3 {
-  font-size: 1.05rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-p {
-  margin-bottom: 0.75rem;
-}
-
-.muted {
-  color: var(--fg-muted);
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.page-title-group {
-  display: flex;
-  flex-direction: column;
-}
-
-/* Banners & Alerts */
-.banner {
-  background: var(--bg-surface);
-  border-left: 4px solid var(--accent);
-  padding: 0.85rem 1.25rem;
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  margin-bottom: 1.5rem;
-  font-size: 0.95rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.banner.warning {
-  border-left-color: var(--warn);
-  background: var(--warn-bg);
-}
-
-.banner.danger {
-  border-left-color: var(--bad);
-  background: var(--bad-bg);
-}
-
-/* Tiles & Stats Grid */
-.tiles {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 1rem;
-  margin: 1.5rem 0;
-}
-
-.tile {
-  background: var(--bg-surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 1.15rem 1.25rem;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.15s ease, border-color 0.15s ease;
-}
-
-.tile:hover {
-  border-color: var(--line-strong);
-}
-
-.tile .num {
-  display: block;
-  font-size: 1.9rem;
-  font-weight: 700;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-  color: var(--fg);
-}
-
-.tile .lbl {
-  color: var(--fg-muted);
-  font-size: 0.825rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-top: 0.25rem;
-  display: block;
-}
-
-.tile.bad .num {
-  color: var(--bad);
-}
-
-.tile.ok .num {
-  color: var(--ok);
-}
-
-.tile.warn .num {
-  color: var(--warn);
-}
-
-/* Tables */
-.table-container {
-  overflow-x: auto;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
-  margin-top: 0.75rem;
-  margin-bottom: 1.5rem;
-  box-shadow: var(--shadow-sm);
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-th, td {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--line);
-  vertical-align: middle;
-}
-
-th {
-  background: var(--bg-surface-hover);
-  color: var(--fg-muted);
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-tr:last-child td {
-  border-bottom: none;
-}
-
-tr:hover td {
-  background: var(--bg-surface-hover);
-}
-
-/* Badges & Status */
-.state {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.775rem;
-  font-weight: 600;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  background: var(--bg-surface-hover);
-  color: var(--fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.state.done {
-  color: var(--ok);
-  background: var(--ok-bg);
-}
-
-.state.failed,
-.state.rejected {
-  color: var(--bad);
-  background: var(--bad-bg);
-}
-
-.state.awaiting_approval {
-  color: var(--warn);
-  background: var(--warn-bg);
-}
-
-.state.running,
-.state.analyzing,
-.state.probing {
-  color: var(--accent);
-  background: var(--accent-bg);
-}
-
-/* Severity Badges */
-.badge-sev {
-  display: inline-block;
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.sev-critical, .sev-high {
-  color: var(--bad);
-  font-weight: 600;
-}
-
-.sev-medium {
-  color: var(--warn);
-  font-weight: 600;
-}
-
-.sev-low, .sev-info {
-  color: var(--fg-muted);
-}
-
-.badge-sev.sev-critical,
-.badge-sev.sev-high {
-  background: var(--bad-bg);
-}
-
-.badge-sev.sev-medium {
-  background: var(--warn-bg);
-}
-
-.badge-sev.sev-low,
-.badge-sev.sev-info {
-  background: var(--bg-surface-hover);
-}
-
-/* Buttons */
-button, .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  font-family: inherit;
-  font-size: 0.925rem;
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: var(--radius-md);
-  padding: 0.6rem 1.25rem;
-  border: 1px solid var(--line-strong);
-  background: var(--bg-surface);
-  color: var(--fg);
-  text-decoration: none;
-  transition: all 0.15s ease-in-out;
-  line-height: 1.4;
-}
-
-button:hover, .btn:hover {
-  background: var(--bg-surface-hover);
-  border-color: var(--fg-muted);
-}
-
-button.primary, .btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #0f172a;
-}
-
-button.primary:hover, .btn.primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
-}
-
-button.danger, .btn.danger {
-  background: transparent;
-  border-color: var(--bad);
-  color: var(--bad);
-}
-
-button.danger:hover, .btn.danger:hover {
-  background: var(--bad-bg);
-  border-color: var(--bad);
-}
-
-/* Stepper / Timeline for Run Screen */
-.steps {
-  list-style: none;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 0.75rem;
-  margin: 1rem 0 2rem;
-}
-
-.steps li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
-  transition: border-color 0.15s ease;
-}
-
-.steps li.active {
-  border-color: var(--accent);
-  background: var(--accent-bg);
-}
-
-.step-info {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.dot {
-  width: 0.75rem;
-  height: 0.75rem;
-  border-radius: 50%;
-  background: var(--fg-subtle);
-  flex: none;
-  transition: all 0.2s ease;
-}
-
-.dot.running {
-  background: var(--warn);
-  box-shadow: 0 0 0 4px var(--warn-bg);
-  animation: pulse 1.5s infinite;
-}
-
-.dot.done {
-  background: var(--ok);
-  box-shadow: 0 0 0 3px var(--ok-bg);
-}
-
-.dot.failed {
-  background: var(--bad);
-  box-shadow: 0 0 0 3px var(--bad-bg);
-}
-
-.dot.skipped {
-  background: var(--line);
-}
-
-@keyframes pulse {
-  0% { transform: scale(0.95); opacity: 0.8; }
-  50% { transform: scale(1.15); opacity: 1; }
-  100% { transform: scale(0.95); opacity: 0.8; }
-}
-
-/* Code & Pre */
-pre {
-  background: var(--bg-surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 1rem;
-  overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  line-height: 1.5;
-  color: var(--fg);
-}
-
-code {
-  font-family: var(--font-mono);
-  font-size: 0.875em;
-  padding: 0.15em 0.4em;
-  border-radius: var(--radius-sm);
-  background: var(--bg-surface-hover);
-  color: var(--accent);
-}
-
-pre code {
-  padding: 0;
-  background: transparent;
-  color: inherit;
-}
-
-/* Cards & Containers */
-.card {
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-  margin-bottom: 1.25rem;
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
-}
-
-.card.blocked {
-  border-left: 4px solid var(--bad);
-  background: var(--bad-bg);
-}
-
-.card.ok {
-  border-left: 4px solid var(--ok);
-  background: var(--ok-bg);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 0.75rem;
-}
-
-.method-tag {
-  display: inline-block;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 800;
-  font-family: var(--font-mono);
-  border-radius: var(--radius-sm);
-  text-transform: uppercase;
-}
-
-.method-tag.get {
-  background: var(--ok-bg);
-  color: var(--ok);
-}
-
-.method-tag.post {
-  background: var(--accent-bg);
-  color: var(--accent);
+  -webkit-font-smoothing: antialiased;
 }
 
 a {
-  color: var(--accent);
+  color: var(--verified);
   text-decoration: none;
 }
 
@@ -600,47 +81,1278 @@ a:hover {
   text-decoration: underline;
 }
 
-/* Comparison / Diff Box */
-.diff-box {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin: 1rem 0;
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
 }
 
-@media (max-width: 768px) {
-  .diff-box {
-    grid-template-columns: 1fr;
+code,
+kbd,
+pre {
+  font-family: var(--mono);
+}
+
+/* Đường dẫn Java trong repo dài và không có chỗ ngắt tự nhiên. Không cho phép
+   ngắt giữa từ thì chúng đẩy cả trang trượt ngang trên màn hình hẹp. */
+code {
+  overflow-wrap: anywhere;
+}
+
+/* `[hidden]` chỉ là `display: none` ở mức user-agent, nên bất kỳ class nào tự
+   đặt `display` cũng thắng nó. Đặt lại ở đây một lần cho toàn trang. */
+[hidden] {
+  display: none !important;
+}
+
+/* Các ô chờ nội dung động vẫn là flex item khi rỗng, nên chúng đẻ ra một
+   khoảng trắng bằng `gap` ở giữa trang dù không hiển thị gì. */
+#console,
+#stall-slot:empty,
+#error-slot:empty,
+#gate-slot:empty {
+  display: none;
+}
+
+/* ── Thanh lệnh ─────────────────────────────────────────────────────────── */
+
+.commandbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding: 0.7rem 1.5rem;
+  background: rgba(11, 14, 23, 0.92);
+  border-bottom: 1px solid var(--rail);
+  backdrop-filter: blur(8px);
+}
+
+.mark {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--paper);
+}
+
+.mark:hover {
+  text-decoration: none;
+  color: var(--signal);
+}
+
+.mark-glyph {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border: 1.5px solid var(--signal);
+  border-radius: 50%;
+  position: relative;
+  align-self: center;
+}
+
+.mark-glyph::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: var(--signal);
+}
+
+.mark-sub {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  font-weight: 500;
+}
+
+.cmdnav {
+  display: flex;
+  gap: 0.25rem;
+  margin-right: auto;
+}
+
+.cmdnav a {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+  color: var(--paper-dim);
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+}
+
+.cmdnav a:hover {
+  color: var(--paper);
+  background: var(--panel);
+  text-decoration: none;
+}
+
+.cmdnav a[aria-current="page"] {
+  color: var(--signal);
+  border-color: var(--signal-line);
+  background: var(--signal-soft);
+}
+
+/* ── Bố cục ─────────────────────────────────────────────────────────────── */
+
+.shell {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 1.75rem 1.5rem 5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.eyebrow::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rail-soft);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.prose {
+  color: var(--paper-dim);
+  font-size: 0.88rem;
+  max-width: 68ch;
+}
+
+.hint {
+  color: var(--paper-faint);
+  font-size: 0.78rem;
+  font-family: var(--mono);
+}
+
+/* ── Đầu trang một lần chạy ─────────────────────────────────────────────── */
+
+.runhead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.runhead-id {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.runid {
+  font-family: var(--mono);
+  font-size: clamp(1.35rem, 3.4vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--paper);
+  line-height: 1.1;
+}
+
+.runhead-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.clock {
+  font-family: var(--mono);
+  font-size: 1.45rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+  line-height: 1;
+}
+
+.clock-unit {
+  font-size: 0.7rem;
+  color: var(--paper-faint);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Đèn trạng thái */
+.lamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 0.3rem 0.65rem 0.3rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--rail);
+  background: var(--panel);
+  color: var(--paper-dim);
+  white-space: nowrap;
+}
+
+.lamp::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.lamp[data-tone="live"] {
+  color: var(--signal);
+  border-color: var(--signal-line);
+  background: var(--signal-soft);
+}
+
+.lamp[data-tone="live"]::before {
+  animation: lamp-blink 1.4s ease-in-out infinite;
+}
+
+.lamp[data-tone="ok"] {
+  color: var(--verified);
+  border-color: var(--verified-line);
+  background: var(--verified-soft);
+}
+
+.lamp[data-tone="bad"] {
+  color: var(--halt);
+  border-color: var(--halt-line);
+  background: var(--halt-soft);
+}
+
+@keyframes lamp-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+/* ── Nút ────────────────────────────────────────────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--r-md);
+  border: 1px solid var(--rail);
+  background: var(--panel-2);
+  color: var(--paper);
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, transform 0.14s ease;
+}
+
+.btn:hover {
+  background: var(--panel-3);
+  border-color: var(--paper-faint);
+  text-decoration: none;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-run {
+  background: var(--signal);
+  border-color: var(--signal);
+  color: #1a1206;
+  font-size: 0.82rem;
+  padding: 0.55rem 1.15rem;
+}
+
+.btn-run:hover {
+  background: #ffc169;
+  border-color: #ffc169;
+}
+
+.btn-go {
+  background: var(--verified);
+  border-color: var(--verified);
+  color: #052220;
+}
+
+.btn-go:hover {
+  background: #7ee0d2;
+  border-color: #7ee0d2;
+}
+
+.btn-stop {
+  background: var(--halt-soft);
+  border-color: var(--halt-line);
+  color: var(--halt);
+}
+
+.btn-stop:hover {
+  background: rgba(255, 107, 132, 0.22);
+  border-color: var(--halt);
+}
+
+.btn[disabled],
+.btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Đường ray chín trạm ────────────────────────────────────────────────── */
+
+.railwrap {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--rail);
+  border-radius: var(--r-lg);
+  padding: 1.6rem 1.4rem 1.15rem;
+  overflow-x: auto;
+}
+
+.rail {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(72px, 1fr));
+  min-width: 720px;
+}
+
+.station {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: center;
+}
+
+.wire {
+  position: absolute;
+  top: 13px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--pending);
+  overflow: hidden;
+}
+
+/* Trạm đầu vẫn có dây, chỉ ngắn hơn: `scan` là bước dài nhất và cũng là bước
+   người xem nhìn đầu tiên — không có dây thì nó chạy mà màn hình đứng im. */
+.station:first-child .wire {
+  width: 50%;
+}
+
+.wire::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background-repeat: no-repeat;
+  background-size: 42% 100%;
+  background-position: -45% 0;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 174, 61, 0) 0%,
+    var(--signal) 42%,
+    #fff3dd 50%,
+    var(--signal) 58%,
+    rgba(255, 174, 61, 0) 100%
+  );
+}
+
+.node {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--pending);
+  background: var(--panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--paper-faint);
+  z-index: 1;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+.station-name {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: var(--paper-faint);
+  transition: color 0.3s ease;
+}
+
+.station-time {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper-dim);
+  min-height: 1em;
+}
+
+/* Trạng thái từng trạm */
+.station[data-status="done"] .wire,
+.station[data-status="skipped"] .wire {
+  background: var(--verified-line);
+}
+
+.station[data-status="done"] .node {
+  background: var(--verified);
+  border-color: var(--verified);
+  color: #04211f;
+}
+
+.station[data-status="done"] .station-name {
+  color: var(--paper-dim);
+}
+
+.station[data-status="skipped"] .node {
+  border-style: dashed;
+  border-color: var(--paper-faint);
+  color: var(--paper-faint);
+}
+
+.station[data-status="running"] .wire {
+  background: var(--signal-line);
+}
+
+.station[data-status="running"] .wire::after {
+  opacity: 1;
+  animation: travel 1.9s linear infinite;
+}
+
+.station[data-status="running"] .node {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+  color: var(--signal);
+  animation: breathe 1.7s ease-in-out infinite;
+}
+
+.station[data-status="running"] .station-name {
+  color: var(--signal);
+}
+
+.station[data-status="waiting"] .wire {
+  background: var(--signal-line);
+}
+
+.station[data-status="waiting"] .node {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+  color: var(--signal);
+  animation: breathe 3.4s ease-in-out infinite;
+}
+
+.station[data-status="waiting"] .station-name {
+  color: var(--signal);
+}
+
+.station[data-status="failed"] .node {
+  background: var(--halt);
+  border-color: var(--halt);
+  color: #24070d;
+}
+
+.station[data-status="failed"] .wire {
+  background: var(--halt-line);
+}
+
+.station[data-status="failed"] .station-name {
+  color: var(--halt);
+}
+
+.station.just-done .node {
+  animation: seal 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes travel {
+  from { background-position: -45% 0; }
+  to { background-position: 145% 0; }
+}
+
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 var(--signal-soft); }
+  50% { box-shadow: 0 0 0 7px rgba(255, 174, 61, 0); }
+}
+
+@keyframes seal {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.32); }
+  100% { transform: scale(1); }
+}
+
+/* Một lượt quét trái→phải khi lần chạy kết thúc */
+.railwrap.sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 55% 100%;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--verified-soft) 50%,
+    transparent 100%
+  );
+  animation: sweep 0.9s ease-out forwards;
+}
+
+@keyframes sweep {
+  from { background-position: -60% 0; }
+  to { background-position: 160% 0; }
+}
+
+/* Treo: mọi chuyển động dừng cùng lúc, và đường ray xám lại */
+.is-stalled .wire::after {
+  animation: none !important;
+  opacity: 0 !important;
+}
+
+.is-stalled .node {
+  animation: none !important;
+}
+
+/* Trạm đứng lại phải KHÁC trạm chưa tới. Nếu cả hai cùng xám thì người xem
+   không đọc được pipeline chết ở đâu — mà đó chính là thông tin cần nhất. */
+.is-stalled .station[data-status="running"] .node {
+  border-color: var(--halt);
+  border-style: dashed;
+  background: var(--halt-soft);
+  color: var(--halt);
+}
+
+.is-stalled .station[data-status="running"] .wire {
+  background: var(--pending);
+}
+
+.is-stalled .station[data-status="running"] .station-name {
+  color: var(--halt);
+}
+
+/* Đèn không được tiếp tục sáng màu "đang chạy" khi đã kết luận là treo. */
+.is-stalled .lamp[data-tone="live"] {
+  color: var(--paper-faint);
+  border-color: var(--rail);
+  background: var(--panel);
+}
+
+.is-stalled .lamp[data-tone="live"]::before {
+  animation: none;
+}
+
+/* ── Đồng hồ đo ─────────────────────────────────────────────────────────── */
+
+.readouts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 0.75rem;
+}
+
+.readout {
+  background: var(--panel);
+  border: 1px solid var(--rail);
+  border-radius: var(--r-md);
+  padding: 0.85rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.readout .num {
+  font-family: var(--mono);
+  font-size: 1.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--paper);
+}
+
+.readout .lbl {
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+
+.readout[data-tone="ok"] .num { color: var(--verified); }
+.readout[data-tone="live"] .num { color: var(--signal); }
+.readout[data-tone="bad"] .num { color: var(--halt); }
+
+.readout .num.tick {
+  animation: tick 0.42s ease-out;
+}
+
+@keyframes tick {
+  0% { transform: translateY(-0.22em); opacity: 0.3; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Bảng thông báo ─────────────────────────────────────────────────────── */
+
+.notice {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding: 0.85rem 1rem;
+  border-radius: var(--r-md);
+  border: 1px solid var(--rail);
+  border-left-width: 3px;
+  background: var(--panel);
+  font-size: 0.88rem;
+  /* Lý do một nhóm bị loại thường nhắc nguyên đường dẫn file, và nó tới đây
+     dưới dạng văn bản thuần chứ không phải trong thẻ <code>. */
+  overflow-wrap: anywhere;
+}
+
+.notice-glyph {
+  font-family: var(--mono);
+  font-weight: 700;
+  flex: none;
+  line-height: 1.5;
+}
+
+/* Phần tử flex mặc định không co nhỏ hơn nội dung của nó, nên một dòng dài
+   trong đây làm cả khối tràn ra ngoài thay vì xuống dòng. */
+.notice > div {
+  min-width: 0;
+}
+
+.notice[data-tone="live"] {
+  border-color: var(--signal-line);
+  border-left-color: var(--signal);
+  background: var(--signal-soft);
+}
+
+.notice[data-tone="live"] .notice-glyph { color: var(--signal); }
+
+.notice[data-tone="bad"] {
+  border-color: var(--halt-line);
+  border-left-color: var(--halt);
+  background: var(--halt-soft);
+}
+
+.notice[data-tone="bad"] .notice-glyph { color: var(--halt); }
+
+.notice[data-tone="ok"] {
+  border-color: var(--verified-line);
+  border-left-color: var(--verified);
+  background: var(--verified-soft);
+}
+
+.notice[data-tone="ok"] .notice-glyph { color: var(--verified); }
+
+.notice ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
+
+/* ── Thẻ phê duyệt ──────────────────────────────────────────────────────── */
+
+.gate {
+  border: 1px solid var(--signal-line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.gate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 1.1rem;
+  background: var(--signal-soft);
+  border-bottom: 1px solid var(--signal-line);
+}
+
+.gate-title {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--signal);
+}
+
+.gate-body {
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: minmax(120px, 168px) 1fr;
+  gap: 0.4rem 1rem;
+  font-size: 0.88rem;
+}
+
+.kv dt {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  padding-top: 0.25rem;
+}
+
+.kv dd {
+  color: var(--paper);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.payload {
+  max-height: 7.5em;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.72rem;
+  color: var(--paper-dim);
+}
+
+.gate-actions {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 0.25rem;
+}
+
+/* ── Terminal ───────────────────────────────────────────────────────────── */
+
+.terminal {
+  border: 1px solid var(--rail);
+  border-radius: var(--r-lg);
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 0.85rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--rail);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+
+.terminal-bar .spacer { flex: 1; }
+
+/* Ô đánh dấu tự vẽ. `accent-color` là cách ngắn hơn nhưng nó không có ở mọi
+   trình duyệt, và một ô xanh dương mặc định giữa bảng màu này trông như lỗi. */
+.toggle input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  flex: none;
+  position: relative;
+  border: 1px solid var(--paper-faint);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.toggle input:checked {
+  background: var(--verified);
+  border-color: var(--verified);
+}
+
+.toggle input:checked::after {
+  content: "";
+  position: absolute;
+  left: 3.5px;
+  top: 0.5px;
+  width: 3px;
+  height: 6px;
+  border: solid #04211f;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(42deg);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0.04em;
+  font-size: 0.7rem;
+  color: var(--paper-dim);
+}
+
+.terminal-body {
+  height: 265px;
+  overflow-y: auto;
+  padding: 0.7rem 0.9rem 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.75;
+  scrollbar-width: thin;
+}
+
+.tline {
+  display: grid;
+  grid-template-columns: 4px 74px 1fr;
+  gap: 0.7rem;
+  align-items: baseline;
+}
+
+.tline::before {
+  content: "";
+  height: 0.72em;
+  border-radius: 1px;
+  background: var(--rail);
+  align-self: center;
+}
+
+.tline[data-level="warn"]::before { background: var(--signal); }
+.tline[data-level="error"]::before { background: var(--halt); }
+
+.tline-step {
+  color: var(--paper-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tline-msg {
+  color: var(--paper-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tline[data-level="warn"] .tline-msg { color: var(--signal); }
+.tline[data-level="error"] .tline-msg { color: var(--halt); }
+
+.tline.fresh {
+  animation: fresh 0.22s ease-out;
+}
+
+@keyframes fresh {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.terminal-empty {
+  color: var(--paper-faint);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
+/* ── Bằng chứng: tab ────────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--rail);
+  padding-bottom: 0.5rem;
+}
+
+.tab {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: none;
+  color: var(--paper-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.tab:hover {
+  background: var(--panel);
+  color: var(--paper);
+}
+
+.tab[aria-selected="true"] {
+  color: var(--paper);
+  background: var(--panel-2);
+  border-color: var(--rail);
+}
+
+.tab-count {
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--panel-3);
+  color: var(--paper-dim);
+}
+
+.tab[aria-selected="true"] .tab-count {
+  background: var(--verified-soft);
+  color: var(--verified);
+}
+
+.panel[hidden] { display: none; }
+
+.panel {
+  padding-top: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  animation: rise 0.28s ease-out;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Bảng ───────────────────────────────────────────────────────────────── */
+
+.tablewrap {
+  overflow-x: auto;
+  border: 1px solid var(--rail);
+  border-radius: var(--r-md);
+  background: var(--panel);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+thead th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 0.63rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+  padding: 0.6rem 0.85rem;
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--rail);
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid var(--rail-soft);
+  vertical-align: top;
+}
+
+tbody tr:last-child td { border-bottom: none; }
+
+tbody tr:hover { background: var(--panel-2); }
+
+td code,
+td .mono {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--paper-dim);
+  overflow-wrap: anywhere;
+}
+
+.num-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dim { color: var(--paper-dim); }
+.faint { color: var(--paper-faint); }
+
+/* ── Thẻ nội dung ───────────────────────────────────────────────────────── */
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--rail);
+  border-radius: var(--r-lg);
+  padding: 1.1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.card-title {
+  font-family: var(--mono);
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--paper);
+  line-height: 1.35;
+}
+
+.card h3 {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--paper-faint);
+}
+
+.card[data-tone="bad"] { border-color: var(--halt-line); }
+.card[data-tone="ok"] { border-color: var(--verified-line); }
+.card[data-tone="live"] { border-color: var(--signal-line); }
+
+.quote {
+  background: var(--panel-2);
+  border-left: 2px solid var(--rail);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.88rem;
+  color: var(--paper-dim);
+}
+
+pre {
+  background: var(--panel-2);
+  border: 1px solid var(--rail);
+  border-radius: var(--r-md);
+  padding: 0.7rem 0.9rem;
+  overflow-x: auto;
+  font-size: 0.76rem;
+  line-height: 1.6;
+  color: var(--paper-dim);
+}
+
+pre code { color: inherit; }
+
+/* Bằng chứng có thể là vài chục dòng Java. Để nó chảy hết chiều cao thì mỗi
+   finding chiếm trọn một màn hình và người đọc không lướt được danh sách. */
+.card pre {
+  max-height: 22em;
+}
+
+.card ul,
+.card ol {
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+  color: var(--paper-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.card li { padding-left: 0.15rem; }
+
+.kbdoc {
+  background: var(--panel-2);
+  border: 1px solid var(--rail);
+  border-radius: var(--r-md);
+  padding: 0.85rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.kbdoc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.safe {
+  border-left: 2px solid var(--verified);
+  background: var(--verified-soft);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: 0.55rem 0.8rem;
+  font-size: 0.85rem;
+  color: var(--paper-dim);
+}
+
+.reflinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.reflink {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--rail);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--verified);
+  overflow-wrap: anywhere;
+}
+
+/* ── Nhãn ───────────────────────────────────────────────────────────────── */
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 0.12rem 0.45rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--rail);
+  background: var(--panel-2);
+  color: var(--paper-dim);
+  white-space: nowrap;
+}
+
+.tag[data-tone="ok"] {
+  color: var(--verified);
+  border-color: var(--verified-line);
+  background: var(--verified-soft);
+}
+
+.tag[data-tone="bad"] {
+  color: var(--halt);
+  border-color: var(--halt-line);
+  background: var(--halt-soft);
+}
+
+.tag[data-tone="live"] {
+  color: var(--signal);
+  border-color: var(--signal-line);
+  background: var(--signal-soft);
+}
+
+.sev-critical,
+.sev-high { color: var(--halt); }
+.sev-medium { color: var(--signal); }
+.sev-low,
+.sev-info,
+.sev-unknown { color: var(--paper-dim); }
+
+.tag.sev-critical,
+.tag.sev-high {
+  border-color: var(--halt-line);
+  background: var(--halt-soft);
+}
+
+.tag.sev-medium {
+  border-color: var(--signal-line);
+  background: var(--signal-soft);
+}
+
+/* ── Trạng thái rỗng ────────────────────────────────────────────────────── */
+
+.empty {
+  border: 1px dashed var(--rail);
+  border-radius: var(--r-lg);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--panel);
+}
+
+.empty-title {
+  font-family: var(--mono);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--paper);
+}
+
+/* ── Trang lịch sử ──────────────────────────────────────────────────────── */
+
+.pagehead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.pagetitle {
+  font-family: var(--mono);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.runrow-id {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--paper);
+}
+
+.runrow-id:hover { color: var(--signal); }
+
+.bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--rail);
+  min-width: 2px;
+  display: block;
+}
+
+.bar[data-tone="ok"] { background: var(--verified); }
+.bar[data-tone="live"] { background: var(--signal); }
+.bar[data-tone="bad"] { background: var(--halt); }
+
+/* ── Chuyển động: tôn trọng lựa chọn của người xem ──────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
   }
 }
 
-.diff-col {
-  display: flex;
-  flex-direction: column;
-}
+/* ── Màn hình hẹp ───────────────────────────────────────────────────────── */
 
-.diff-col-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--fg-muted);
-  margin-bottom: 0.4rem;
-}
-
-.diff-col pre {
-  flex: 1;
-}
-
-/* Empty States */
-.empty-state {
-  text-align: center;
-  padding: 3rem 1.5rem;
-  background: var(--bg-surface);
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-lg);
-  margin: 1.5rem 0;
-}
-
-.empty-state p {
-  color: var(--fg-muted);
-  font-size: 0.95rem;
+@media (max-width: 720px) {
+  .shell { padding: 1.25rem 1rem 4rem; }
+  .commandbar { padding: 0.6rem 1rem; gap: 0.75rem; }
+  .mark-sub { display: none; }
+  .kv { grid-template-columns: 1fr; gap: 0.15rem 0; }
+  .kv dd { margin-bottom: 0.5rem; }
+  .tline { grid-template-columns: 4px 1fr; }
+  .tline-step { display: none; }
+  .terminal-body { height: 240px; }
 }

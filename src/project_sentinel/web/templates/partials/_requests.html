@@ -1,0 +1,51 @@
+{# Mọi request kiểm chứng đều đi qua Gateway, và mọi request đều để lại dòng log. #}
+<div class="notice" data-tone="ok">
+  <span class="notice-glyph" aria-hidden="true">✓</span>
+  <div>Nhật ký này không bao giờ chứa khoá xác thực — đó là một tiêu chí bắt buộc, có test canh.</div>
+</div>
+
+{% if not requests %}
+<div class="empty">
+  <p class="empty-title">Không có request nào</p>
+  <p class="prose">Lần chạy này chưa gửi request kiểm chứng nào qua Gateway.</p>
+</div>
+{% else %}
+<div class="tablewrap">
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Thời điểm</th>
+        <th scope="col">Method</th>
+        <th scope="col">Đường dẫn</th>
+        <th scope="col">Chính sách</th>
+        <th scope="col">HTTP</th>
+        <th scope="col">Độ trễ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in requests %}
+      <tr>
+        <td class="faint num-cell"><code>{{ item.timestamp }}</code></td>
+        <td><span class="tag">{{ item.method }}</span></td>
+        <td><code>{{ item.path }}</code></td>
+        <td>
+          {% if item.policy_decision == "DENIED" or item.status == "DENIED" %}
+          <span class="tag" data-tone="bad">DENIED</span>
+          {% else %}
+          <span class="tag" data-tone="ok">ALLOWED</span>
+          {% endif %}
+        </td>
+        <td class="num-cell">{% if item.status_code %}<code>{{ item.status_code }}</code>{% else %}<span class="faint">—</span>{% endif %}</td>
+        <td class="num-cell dim">{% if item.elapsed_ms %}{{ item.elapsed_ms }} ms{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if probe_result.denied_reason %}
+<article class="card" data-tone="bad">
+  <p><strong>Không request nào được gửi:</strong> {{ probe_result.denied_reason }}</p>
+</article>
+{% endif %}

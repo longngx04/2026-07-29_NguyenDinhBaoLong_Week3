@@ -1,0 +1,36 @@
+{# Cổng người-trong-vòng-lặp. Dùng chung cho bảng điều khiển và hàng chờ duyệt.
+   Cần: gate_run_id, gate_request. #}
+<section class="gate">
+  <div class="gate-head">
+    <span class="gate-title">CHỜ NGƯỜI VẬN HÀNH QUYẾT ĐỊNH</span>
+    <a class="hint" href="/runs/{{ gate_run_id }}">{{ gate_run_id }}</a>
+  </div>
+  <div class="gate-body">
+    <p class="prose">
+      Pipeline đã dừng lại tại đây. Request dưới đây chạm vào ứng dụng đích thật,
+      nên nó không được gửi cho tới khi có người bấm.
+    </p>
+
+    <dl class="kv">
+      <dt>Endpoint</dt>
+      <dd><span class="tag">{{ gate_request.method }}</span> <code>{{ gate_request.endpoint }}</code></dd>
+
+      <dt>Payload</dt>
+      {# Payload kiểm thử độ dài có thể dài cả nghìn ký tự. Để nó chảy tự do thì
+         "mục đích" và "rủi ro" — hai thứ người duyệt thực sự cần đọc — bị đẩy
+         khỏi màn hình. Đóng khung lại, vẫn cuộn xem đủ được. #}
+      <dd><pre class="payload">{{ gate_request.payload or "(không có payload)" }}</pre></dd>
+
+      <dt>Mục đích</dt>
+      <dd>{{ gate_request.purpose }}</dd>
+
+      <dt>Rủi ro</dt>
+      <dd class="sev-medium">{{ gate_request.risk_reason }}</dd>
+    </dl>
+
+    <form class="gate-actions" method="post" action="/approvals/{{ gate_run_id }}">
+      <button type="submit" name="decision" value="approve" class="btn btn-go">✓ Approve — cho gửi</button>
+      <button type="submit" name="decision" value="reject" class="btn btn-stop">✗ Reject — dừng lại</button>
+    </form>
+  </div>
+</section>
