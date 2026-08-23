@@ -24,6 +24,7 @@ def build_llm(config: AppConfig) -> LLMProvider:
                 model=config.model_name,
                 timeout_seconds=config.timeout,
                 max_retries=config.max_retries,
+                rate_limit_max_retries=config.rate_limit_max_retries,
             )
         )
     raise ValueError(f"Unsupported LLM_PROVIDER: {config.provider_type}")

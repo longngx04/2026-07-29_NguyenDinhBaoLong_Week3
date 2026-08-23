@@ -156,6 +156,9 @@ class _GroupOutcome:
     prompt_tokens: Optional[int] = None
     completion_tokens: Optional[int] = None
     total_tokens: Optional[int] = None
+    # So lan may chu tu choi vi gioi han toc do, cong qua moi lan goi cua nhom.
+    # Day la so lieu duy nhat noi duoc muc song song da cham tran hay chua.
+    rate_limited_attempts: int = 0
     validation_errors: List[str] = field(default_factory=list)
 
     def add_tokens(self, result: Any) -> None:
@@ -170,6 +173,7 @@ class _GroupOutcome:
                 continue
             current = getattr(self, field_name)
             setattr(self, field_name, (current or 0) + value)
+        self.rate_limited_attempts += getattr(result, "rate_limited_attempts", 0) or 0
 
 
 def _analyze_one_group(
@@ -439,6 +443,8 @@ def run_pipeline(config: AppConfig) -> Dict[str, Any]:
             "invalid_reasons": {},
             "unresolved_group_reasons": {},
             "calibrated_record_count": 0,
+            "llm_concurrency": config.llm_concurrency,
+            "rate_limited_call_count": 0,
             "unsafe_output_count": 0,
             "unsafe_responses_observed": 0,
             "invalid_objective_count": 0,
@@ -471,6 +477,7 @@ def run_pipeline(config: AppConfig) -> Dict[str, Any]:
     invalid_reasons: Dict[str, int] = {}
     unresolved_group_reasons: Dict[str, List[str]] = {}
     calibrated_record_count = 0
+    rate_limited_call_count = 0
     unsafe_output_count = 0
     unsafe_responses_observed = 0
     invalid_objective_count = 0
@@ -495,6 +502,7 @@ def run_pipeline(config: AppConfig) -> Dict[str, Any]:
         invalid_output_count += outcome.invalid_output_count
         invalid_responses_observed += outcome.invalid_responses_observed
         calibrated_record_count += 1 if outcome.calibrated else 0
+        rate_limited_call_count += outcome.rate_limited_attempts
         unsafe_output_count += outcome.unsafe_output_count
         unsafe_responses_observed += outcome.unsafe_responses_observed
         invalid_objective_count += outcome.invalid_objective_count
@@ -559,6 +567,10 @@ def run_pipeline(config: AppConfig) -> Dict[str, Any]:
         "invalid_reasons": redacted_invalid_reasons,
         "unresolved_group_reasons": redacted_unresolved_reasons,
         "calibrated_record_count": calibrated_record_count,
+        # Hai truong nay ton tai de lan chinh toc do sau khong phai suy ra bang
+        # phep chia nhu lan nay: bao nhieu luong, va co cham tran rate-limit khong.
+        "llm_concurrency": config.llm_concurrency,
+        "rate_limited_call_count": rate_limited_call_count,
 
         "unsafe_output_count": unsafe_output_count,
         "unsafe_responses_observed": unsafe_responses_observed,

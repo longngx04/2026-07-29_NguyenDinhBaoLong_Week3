@@ -5,6 +5,7 @@ Direct HTTPS calls via standard library (urllib.request) with bounded retries an
 
 import json
 import logging
+import random
 import time
 import urllib.error
 import urllib.request
@@ -20,6 +21,11 @@ from project_sentinel.llm.base import (
 
 logger = logging.getLogger(__name__)
 MAX_LLM_RESPONSE_BYTES = 1_048_576
+
+
+RATE_LIMIT_MAX_RETRIES_DEFAULT = 4
+RATE_LIMIT_BASE_DELAY_S = 1.0
+RATE_LIMIT_MAX_DELAY_S = 30.0
 
 
 def _sanitize_error(message: str, api_key: Optional[str] = None) -> str:
@@ -88,14 +94,38 @@ class OpenRouterClient(LLMProvider):
         model: str = "deepseek/deepseek-v4-flash-0731",
         timeout_seconds: float = 30.0,
         max_retries: int = 1,
-        system_prompt_path: Optional[Path] = None
+        system_prompt_path: Optional[Path] = None,
+        rate_limit_max_retries: int = RATE_LIMIT_MAX_RETRIES_DEFAULT,
     ):
         self.api_key = api_key
         self.base_url = base_url
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
+        # Bi gioi han toc do va may chu loi tam thoi la HAI chuyen khac nhau,
+        # nen chung khong dung chung mot ngan sach thu lai. Bước analyze chay
+        # hang chuc luong song song: mot lan 429 la binh thuong, con `max_retries`
+        # duoc dat cho loi mang va phai giu nguyen y nghia do.
+        self.rate_limit_max_retries = max(0, rate_limit_max_retries)
         self.system_prompt_path = system_prompt_path
+
+    def _rate_limit_delay(self, error: urllib.error.HTTPError, attempt: int) -> float:
+        """Bao lau truoc khi thu lai sau mot lan 429.
+
+        Uu tien header `Retry-After` cua may chu — no biet ro hon moi phong doan.
+        Khong co thi lui theo ham mu, kem jitter: hang chuc luong cung bi tu choi
+        mot luc ma ngu y het nhau thi chung va lai dung nhip, va lan thu lai thu
+        hai that bai het sao y lan dau.
+        """
+        headers = getattr(error, "headers", None)
+        raw = headers.get("Retry-After") if headers else None
+        if raw:
+            try:
+                return min(float(raw), RATE_LIMIT_MAX_DELAY_S)
+            except (TypeError, ValueError):
+                pass
+        ceiling = min(RATE_LIMIT_BASE_DELAY_S * (2 ** attempt), RATE_LIMIT_MAX_DELAY_S)
+        return ceiling * (0.5 + random.random() / 2.0)
 
     def _load_system_prompt(self) -> str:
         """Nạp luật đã được review. Thiếu file thì dừng, không thay thế.
@@ -149,12 +179,15 @@ class OpenRouterClient(LLMProvider):
             "User-Agent": "Project-Sentinel/1.0"
         }
 
-        attempts = 0
+        # Hai bo dem tach roi: mot cho loi tam thoi cua may chu/mang, mot cho
+        # viec bi gioi han toc do. Gop chung lam mot nghia la dung mot lan 429
+        # da tieu het luot danh cho loi mang.
+        transient_retries = 0
+        rate_limited_attempts = 0
         last_error: Optional[str] = None
         start_time = time.time()
 
-        while attempts <= self.max_retries:
-            attempts += 1
+        while True:
             req = urllib.request.Request(endpoint, data=body_bytes, headers=headers, method="POST")
             attempt_deadline = time.monotonic() + self.timeout_seconds
 
@@ -169,7 +202,8 @@ class OpenRouterClient(LLMProvider):
 
                     if "choices" not in resp_json or not resp_json["choices"]:
                         last_error = "OpenRouter response missing 'choices'"
-                        if attempts <= self.max_retries:
+                        if transient_retries < self.max_retries:
+                            transient_retries += 1
                             continue
                         break
 
@@ -178,7 +212,8 @@ class OpenRouterClient(LLMProvider):
 
                     if not content_str:
                         last_error = "OpenRouter choice message content is empty"
-                        if attempts <= self.max_retries:
+                        if transient_retries < self.max_retries:
+                            transient_retries += 1
                             continue
                         break
 
@@ -195,7 +230,8 @@ class OpenRouterClient(LLMProvider):
                         parsed = _unwrap_json_envelope(json.loads(content_clean))
                     except json.JSONDecodeError as je:
                         last_error = f"Malformed assistant JSON response: {je}"
-                        if attempts <= self.max_retries:
+                        if transient_retries < self.max_retries:
+                            transient_retries += 1
                             continue
                         break
 
@@ -210,23 +246,32 @@ class OpenRouterClient(LLMProvider):
                         prompt_tokens=usage.get("prompt_tokens"),
                         completion_tokens=usage.get("completion_tokens"),
                         total_tokens=usage.get("total_tokens"),
-                        latency_ms=latency
+                        latency_ms=latency,
+                        rate_limited_attempts=rate_limited_attempts,
                     )
 
             except urllib.error.HTTPError as e:
                 status_code = e.code
                 err_msg = f"HTTP Error {status_code}: {e.reason}"
                 last_error = self._sanitize_error(err_msg)
-                if status_code in (429, 500, 502, 503, 504) and attempts <= self.max_retries:
-                    time.sleep(1.0 * attempts)
+                if status_code == 429:
+                    if rate_limited_attempts < self.rate_limit_max_retries:
+                        rate_limited_attempts += 1
+                        time.sleep(self._rate_limit_delay(e, rate_limited_attempts))
+                        continue
+                    break
+                if status_code in (500, 502, 503, 504) and transient_retries < self.max_retries:
+                    transient_retries += 1
+                    time.sleep(1.0 * transient_retries)
                     continue
                 break
 
             except (urllib.error.URLError, TimeoutError) as e:
                 err_msg = f"Network Error: {str(e)}"
                 last_error = self._sanitize_error(err_msg)
-                if attempts <= self.max_retries:
-                    time.sleep(1.0 * attempts)
+                if transient_retries < self.max_retries:
+                    transient_retries += 1
+                    time.sleep(1.0 * transient_retries)
                     continue
                 break
 
@@ -241,7 +286,8 @@ class OpenRouterClient(LLMProvider):
             parsed_response=None,
             model_name=self.model,
             latency_ms=latency,
-            error=last_error or "Unknown error in OpenRouter provider"
+            error=last_error or "Unknown error in OpenRouter provider",
+            rate_limited_attempts=rate_limited_attempts,
         )
 
     def generate(self, *, system_prompt: str, user_prompt: str) -> LLMResult:

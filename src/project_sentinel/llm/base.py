@@ -56,6 +56,9 @@ class LLMResult:
     total_tokens: Optional[int] = None
     latency_ms: float = 0.0
     error: Optional[str] = None
+    # So lan loi goi nay bi may chu tu choi vi gioi han toc do. Bang khong o
+    # duong chay binh thuong; lon hon khong nghia la muc song song dang cham tran.
+    rate_limited_attempts: int = 0
 
 
 @runtime_checkable

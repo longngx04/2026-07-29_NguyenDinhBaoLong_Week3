@@ -60,9 +60,21 @@ class AppConfig:
         os.getenv("LLM_TIMEOUT_SECONDS", os.getenv("LLM_TIMEOUT", "60"))
     ))
     max_retries: int = field(default_factory=lambda: int(os.getenv("LLM_MAX_RETRIES", "1")))
-    # Number of finding groups analyzed concurrently. Groups are independent and
-    # results are reassembled in input order, so this changes runtime only.
-    llm_concurrency: int = field(default_factory=lambda: max(1, int(os.getenv("LLM_CONCURRENCY", "4"))))
+    # Ngan sach thu lai RIENG cho loi 429, tach khoi `max_retries`. Chay hang
+    # chuc luong song song thi bi gioi han toc do la chuyen thuong; de no an vao
+    # ngan sach cua loi mang nghia la mot lan 429 lam mat mot finding.
+    rate_limit_max_retries: int = field(
+        default_factory=lambda: max(0, int(os.getenv("LLM_RATE_LIMIT_MAX_RETRIES", "4")))
+    )
+    # So nhom duoc phan tich dong thoi. Cac nhom doc lap nhau va ket qua duoc
+    # rap lai theo dung thu tu dau vao, nen con so nay chi doi thoi gian chay.
+    #
+    # 40 la con so DO duoc, khong phai doan: tren cung 37 finding, muc 4 mat
+    # 344-415 giay, muc 12 mat 165 giay, muc 37 mat 108 giay — va khong lan nao
+    # gap loi 429. Do tre moi loi goi tang dan theo muc song song (34 giay o
+    # muc 4, 54 giay o muc 37) nen day cao hon nua lai it dan. `_analyze_groups`
+    # tu cat xuong `min(gia tri nay, so nhom)`.
+    llm_concurrency: int = field(default_factory=lambda: max(1, int(os.getenv("LLM_CONCURRENCY", "40"))))
     validation_max_retries: int = field(default_factory=lambda: int(os.getenv("VALIDATION_MAX_RETRIES", "1")))
     
     # Analysis Limits & Parameters
