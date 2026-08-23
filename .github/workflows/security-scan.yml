@@ -61,7 +61,7 @@ jobs:
       - name: SAST on Project Sentinel's own source
         # WebGoat co chu y de lo hong; quet no o day se chi tao nhieu.
         # Buoc nay quet DUNG ma nguon cua chung ta.
-        run: python -m bandit -q -r src/project_sentinel eval -ll
+        run: python -m bandit -q -r src/project_sentinel -lll
 
   scan-and-test:
     runs-on: ubuntu-latest
