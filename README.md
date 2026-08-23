@@ -169,8 +169,8 @@ make clean-runs                    # KEEP=10 để giữ nhiều hơn
 make target-down
 ```
 
-Bước `analyze` mất khoảng **6 phút** (đo thực tế khoảng 360–370 s với ~41–44 lời gọi LLM cho 37 nhóm, giá trị dao động tùy lần chạy). Đừng chạy trực tiếp khi đang
-trình diễn — xem [docs/demo-script.md](docs/demo-script.md).
+Bước `analyze` mất khoảng **6 phút** (đo thực tế khoảng 360–370 s với ~41–44 lời gọi LLM
+cho 37 nhóm, giá trị dao động tùy lần chạy). Đừng chạy trực tiếp khi đang trình diễn.
 
 ### Bảy lệnh con
 
@@ -321,7 +321,6 @@ dẫn — đây là ràng buộc Python kiểm, không phải lời khuyên tron
 | [docs/architecture.md](docs/architecture.md) | Người cần hiểu ranh giới tin cậy và vòng đời state |
 | [docs/product-brief.md](docs/product-brief.md) | Người quyết định có nên dùng sản phẩm này không |
 | [docs/limitations.md](docs/limitations.md) | **Đọc trước khi tin bất kỳ con số nào** |
-| [docs/demo-script.md](docs/demo-script.md) | Người sắp trình diễn 10–15 phút |
 | [docs/target-webgoat.md](docs/target-webgoat.md) | Người cần biết về ứng dụng đích |
 
 ---

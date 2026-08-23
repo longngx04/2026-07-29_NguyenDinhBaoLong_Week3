@@ -60,3 +60,7 @@ reports/week-04/artifacts/auto-review-*.md
 
 # Git worktrees (moi branch mot thu muc, khong commit vao repo)
 .worktrees/
+
+# Kich ban demo la ghi chu rieng cua nguoi trinh bay, khong phai
+# deliverable cho nguoi cham.
+docs/demo-script.md
