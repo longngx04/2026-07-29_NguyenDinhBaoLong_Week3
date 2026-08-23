@@ -59,6 +59,7 @@ class Tier2Entry:
     not_exploitable_when: str
     no_rule_yet: bool
     body: str
+    references: tuple[str, ...] = ()
 
 
 def _split_frontmatter(text: str, path: Path) -> tuple[str, str]:
@@ -114,6 +115,20 @@ def parse_tier2(path: Path) -> Tier2Entry:
         rule_ids_raw, "matches_rule_ids", path
     )
 
+    references_raw = meta.get("references")
+    references: tuple[str, ...] = ()
+    if references_raw is not None:
+        # references chua danh sach URL tham khao chuan hoa (OWASP, CWE, Oracle docs...).
+        # Kiem tra tung URL phai bat dau bang http:// hoac https:// de loai bo URL sai dinh dang,
+        # tranh loi link hoac schema khong dong nhat tren giao dien Web va prompt.
+        refs_tuple = _as_str_tuple(references_raw, "references", path)
+        for ref in refs_tuple:
+            if not (ref.startswith("http://") or ref.startswith("https://")):
+                raise KbSchemaError(
+                    f"{path}: reference '{ref}' khong phai URL hop le (phai bat dau bang http:// hoac https://)"
+                )
+        references = refs_tuple
+
     return Tier2Entry(
         path=path,
         id=str(meta["id"]).strip(),
@@ -128,6 +143,7 @@ def parse_tier2(path: Path) -> Tier2Entry:
         not_exploitable_when=str(meta["not_exploitable_when"]).strip(),
         no_rule_yet=no_rule_yet,
         body=body,
+        references=references,
     )
 
 

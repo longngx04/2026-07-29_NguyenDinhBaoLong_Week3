@@ -104,3 +104,29 @@ def test_entry_chua_co_rule_khong_can_matches_rule_ids(tmp_path: Path) -> None:
 
 def test_load_tier2_tra_ve_rong_khi_thu_muc_khong_ton_tai(tmp_path: Path) -> None:
     assert load_tier2(tmp_path / "khong-co") == []
+
+
+def test_entry_co_references_doc_ra_danh_sach_url(tmp_path: Path) -> None:
+    """Entry co `references` phai doc ra duoc tuple cac URL hop le."""
+    text = VALID.replace(
+        "matches_rule_ids:\n  - java-sql-statement-execution\n",
+        "matches_rule_ids:\n  - java-sql-statement-execution\n"
+        "references:\n"
+        "  - https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html\n"
+        "  - https://cwe.mitre.org/data/definitions/89.html\n",
+    )
+    entry = parse_tier2(_write(tmp_path, text))
+    assert len(entry.references) == 2
+    assert entry.references[0].startswith("https://")
+
+
+def test_references_chua_url_khong_hop_le_bi_tu_choi(tmp_path: Path) -> None:
+    """Moi URL trong `references` phai bat dau bang http:// hoac https://, tranh du lieu rac."""
+    text = VALID.replace(
+        "matches_rule_ids:\n  - java-sql-statement-execution\n",
+        "matches_rule_ids:\n  - java-sql-statement-execution\n"
+        "references:\n  - khong-phai-url-hop-le\n",
+    )
+    with pytest.raises(KbSchemaError, match="URL"):
+        parse_tier2(_write(tmp_path, text))
+
