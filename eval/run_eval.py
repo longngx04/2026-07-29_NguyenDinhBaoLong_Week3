@@ -229,6 +229,21 @@ def evaluate(case: EvalCase, records: list[dict[str, Any]]) -> EvalOutcome:
                 f"Agent xuất disposition bị cấm '{forbidden_disposition}': {dispositions}"
             )
 
+    must_cite = expected.get("must_cite_path")
+    if must_cite:
+        # Trích dẫn Tier 2 là hợp đồng bắt buộc ở ca 13; thiếu tài liệu tra được theo rule_id thì coi như trượt.
+        cited = {
+            kref.get("path")
+            for record in records
+            for kref in (record.get("knowledge_refs") or [])
+            if isinstance(kref, dict)
+        }
+        if must_cite not in cited:
+            outcome.passed = False
+            outcome.notes.append(
+                f"Không trích tài liệu bắt buộc '{must_cite}'; đã trích: {sorted(cited)}"
+            )
+
     ceiling = expected.get("severity_at_most")
     if ceiling:
         # Tang hieu chinh CHI duoc ha. Ca nay bat no that su ha, thay vi chi tin.

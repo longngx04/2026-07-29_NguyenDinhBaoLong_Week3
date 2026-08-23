@@ -230,4 +230,46 @@ def validate_provenance(
                     f"khong khop score that {scores[path_value]}"
                 )
 
+    # 10. Hit Tier 2 tra duoc theo rule_id la khop CHINH XAC, nen record buoc phai
+    #     trich no. Khong rang buoc voi match_kind="cwe": mot CWE bao nhieu sink
+    #     khac nhau, entry tra ra co the khong dung sink cua finding nay, va bat
+    #     trich mot tai lieu co the khong lien quan la day agent trich cho co.
+    cited_paths = {
+        kref.get("path")
+        for kref in record_dict.get("knowledge_refs", [])
+        if isinstance(kref, dict)
+    }
+    required_hits = [
+        hit
+        for hit in (input_knowledge_hits or [])
+        if isinstance(hit, dict) and hit.get("match_kind") == "rule_id"
+    ]
+    for hit in required_hits:
+        if hit.get("path") not in cited_paths:
+            errors.append(
+                f"Thieu trich dan bat buoc: packet co tai lieu Tier 2 khop theo "
+                f"rule_id, record phai co knowledge_refs chua "
+                f"{{\"path\": \"{hit.get('path')}\", \"score\": {hit.get('score')}}}"
+            )
+
+    # 11. Dich may doc duoc cho mot chi thi da co san trong system prompt:
+    #     "Write `title` as the canonical vulnerability category". Truoc day
+    #     khong ai kiem cau do.
+    tier2_by_path = {
+        hit.get("path"): hit
+        for hit in (input_knowledge_hits or [])
+        if isinstance(hit, dict) and hit.get("tier") == 2
+    }
+    record_title = str(record_dict.get("title") or "").strip().casefold()
+    for path_value in cited_paths:
+        tier2_hit = tier2_by_path.get(path_value)
+        if tier2_hit is None:
+            continue
+        expected = str(tier2_hit.get("canonical_category") or "").strip()
+        if expected and record_title != expected.casefold():
+            errors.append(
+                f"title '{record_dict.get('title')}' khong khop canonical_category "
+                f"cua tai lieu da trich; phai la '{expected}'"
+            )
+
     return len(errors) == 0, errors

@@ -2,7 +2,7 @@ SHELL := /usr/bin/env bash
 .SHELLFLAGS := -eu -o pipefail -c
 PYTHON := $(shell command -v .venv/bin/python3 2>/dev/null || command -v python3)
 
-.PHONY: up down target-up target-down scan scan-opengrep dast scan-zap normalize normalize-zap scan-all analyze-dast dast-test search analyze validate-analysis agent-test llm-test probe run runs clean-runs eval gateway-build gateway-up gateway-reset gateway-down gateway-test gateway-live-test gateway-demo exercise-test guardrails-test guardrails-demo score-ground-truth lint typecheck coverage dep-audit self-scan quality refresh-recall-truth web web-docker
+.PHONY: up down target-up target-down scan scan-opengrep dast scan-zap normalize normalize-zap scan-all analyze-dast dast-test search kb-coverage kb-links analyze validate-analysis agent-test llm-test probe run runs clean-runs eval gateway-build gateway-up gateway-reset gateway-down gateway-test gateway-live-test gateway-demo exercise-test guardrails-test guardrails-demo score-ground-truth lint typecheck coverage dep-audit self-scan quality refresh-recall-truth web web-docker
 
 # Week 4 tests exercise the real Gateway and WebGoat.  The dependency starts
 # both services and waits for the allowlisted health endpoint before pytest.
@@ -109,6 +109,15 @@ normalize:
 search:
 	@test -n "$(Q)" || (printf '%s\n' 'Usage: make search Q='\''SQL Injection'\''' >&2; exit 1)
 	@$(PYTHON) -m project_sentinel.retrieval.keyword_search $(Q)
+
+# KB dung o dau so voi lo hong co that. Khong goi LLM, khong can Docker.
+kb-coverage:
+	@$(PYTHON) -m project_sentinel.retrieval.kb_coverage
+
+# Kiem URL trich dan trong KB co con song khong. CAN MANG, nen KHONG nam
+# trong `make quality` — CI khong duoc do vi mot trang tai lieu ben ngoai.
+kb-links:
+	@./scripts/check-kb-links.sh
 
 analyze:
 	$(PYTHON) -m project_sentinel.cli analyze \

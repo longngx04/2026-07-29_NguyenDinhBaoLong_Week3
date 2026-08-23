@@ -63,6 +63,52 @@
   <p><strong>Bằng chứng từ công cụ quét:</strong></p>
   <pre><code>{% for ev in item.evidence %}{{ ev.content }}
 {% endfor %}</code></pre>
+
+  {% if item.knowledge_details %}
+  <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line);">
+    <p style="margin-bottom: 0.75rem;"><strong>Tài liệu tri thức &amp; Hướng dẫn khắc phục (Knowledge Base &amp; Remediation):</strong></p>
+    {% for kb in item.knowledge_details %}
+    <div style="background: var(--bg-surface-hover); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 0.75rem; border: 1px solid var(--line);">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <div>
+          <strong style="font-size: 0.95rem;">{{ kb.title }}</strong>
+          {% if kb.id %}<span class="muted" style="font-size: 0.85rem; margin-left: 0.5rem;"><code>{{ kb.id }}</code></span>{% endif %}
+        </div>
+        {% if kb.score %}
+        <span class="badge" style="font-size: 0.75rem; background: var(--accent-bg); color: var(--accent); padding: 0.1rem 0.4rem; border-radius: var(--radius-sm);">Độ khớp: {{ kb.score }}%</span>
+        {% endif %}
+      </div>
+
+      {% if kb.safe_alternative %}
+      <p style="margin-bottom: 0.5rem;">
+        <strong>✅ Giải pháp thay thế an toàn (Safe Alternative):</strong><br>
+        <code>{{ kb.safe_alternative }}</code>
+      </p>
+      {% endif %}
+
+      {% if kb.not_exploitable_when %}
+      <div style="background: var(--ok-bg); border-left: 3px solid var(--ok); padding: 0.6rem 0.85rem; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-bottom: 0.5rem;">
+        <strong style="color: var(--ok); font-size: 0.85rem; display: block; margin-bottom: 0.2rem;">🛡️ Điều kiện không thể khai thác (Safe Boundaries):</strong>
+        <span style="font-size: 0.9rem;">{{ kb.not_exploitable_when }}</span>
+      </div>
+      {% endif %}
+
+      {% if kb.references %}
+      <div style="margin-top: 0.5rem;">
+        <strong style="font-size: 0.85rem; color: var(--fg-muted);">🔗 Tài liệu tham khảo thẩm quyền:</strong>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.25rem;">
+          {% for ref_url in kb.references %}
+          <a href="{{ ref_url }}" target="_blank" rel="noopener noreferrer" class="badge" style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; background: var(--bg-surface); border: 1px solid var(--line-strong); padding: 0.2rem 0.5rem; border-radius: var(--radius-sm); color: var(--accent);">
+            <span>↗</span> {{ ref_url }}
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 </article>
 {% endfor %}
 

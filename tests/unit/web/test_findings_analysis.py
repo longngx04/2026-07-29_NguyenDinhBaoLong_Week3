@@ -110,3 +110,34 @@ def test_unknown_run_returns_404_on_both_screens(client):
     http, _ = client
     assert http.get("/runs/20200101T000000Z/findings").status_code == 404
     assert http.get("/runs/20200101T000000Z/analysis").status_code == 404
+
+
+def test_analysis_screen_shows_knowledge_references_and_safe_boundaries(client):
+    """Màn hình phân tích phải hiển thị link tham chiếu và điều kiện an toàn từ KB."""
+    http, ctx = client
+    rec = new_run(ctx.runs_dir)
+    (rec.root / "analysis.jsonl").write_text(json.dumps({
+        "analysis_id": "analysis-sqli",
+        "title": "SQL Injection",
+        "severity": "high",
+        "confidence": "high",
+        "explanation": "Truy vấn ghép chuỗi từ dữ liệu người dùng.",
+        "remediation": ["Dùng PreparedStatement"],
+        "locations": [{"file": "src/Login.java", "line": 42}],
+        "evidence": [{"type": "scanner", "finding_id": "f1", "content": "concat in SQL"}],
+        "knowledge_refs": [
+            {"path": "data/knowledge-base/tier2/java-sql-statement-execute.md", "score": 100.0}
+        ],
+    }) + "\n", encoding="utf-8")
+    save_run(rec)
+
+    response = http.get(f"/runs/{rec.run_id}/analysis")
+    assert response.status_code == 200
+    body = response.text
+    # Kiểm tra liên kết tham chiếu OWASP Cheat Sheet
+    assert "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html" in body
+    # Kiểm tra giải pháp thay thế an toàn
+    assert "PreparedStatement" in body
+    # Kiểm tra điều kiện không thể khai thác (Safe Boundaries)
+    assert "PreparedStatement.setXxx" in body or "hằng biên dịch" in body
+

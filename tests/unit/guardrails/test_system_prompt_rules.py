@@ -108,3 +108,21 @@ def test_openrouter_uses_the_same_payload_builder():
     src = inspect.getsource(OpenRouterClient.analyze)
     assert "build_packet_dict" in src
     assert "packet_dict = {" not in src, "openrouter đang tự dựng payload riêng"
+
+
+def test_prompt_bat_buoc_trich_dan_tai_lieu_tier2():
+    """Luat provenance 10/11 phat agent; prompt phai noi truoc de no biet duong."""
+    text = (REPO_ROOT / "configs" / "prompts" / "security-analysis-system.md").read_text(
+        encoding="utf-8"
+    )
+    assert "match_kind" in text
+    assert "canonical_category" in text
+    assert "not_exploitable_when" in text
+
+
+def test_prompt_canh_bao_hit_keyword_la_khop_mo():
+    """Do duoc 46/46 hit keyword tren finding SAST deu sai ho lo hong."""
+    text = (REPO_ROOT / "configs" / "prompts" / "security-analysis-system.md").read_text(encoding="utf-8")
+    assert "keyword" in text
+    assert "fuzzy" in text
+

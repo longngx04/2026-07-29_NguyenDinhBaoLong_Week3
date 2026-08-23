@@ -16,6 +16,8 @@ from project_sentinel.orchestrator.context import RunContext
 from project_sentinel.orchestrator.metrics import collect_metrics
 from project_sentinel.orchestrator.run_log import read_log
 from project_sentinel.orchestrator.state import RunRecord, list_runs, load_run
+from project_sentinel.retrieval.kb_schema import parse_tier2
+import yaml
 
 MAX_RUNS_ON_OVERVIEW = 20
 
@@ -163,11 +165,136 @@ def findings_data(ctx: RunContext, run_id: str) -> dict:
     }
 
 
+def _split_yaml_frontmatter(text: str) -> tuple[str, str]:
+    """Tách frontmatter YAML và phần thân markdown.
+
+    Dùng cho các tài liệu tri thức (Tier 1 hoặc tài liệu tự do) khi cần đọc nhanh metadata
+    mà không ràng buộc chặt chẽ theo schema Tier 2.
+    """
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return "", text
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return "\n".join(lines[1:i]), "\n".join(lines[i + 1:]).strip()
+    return "", text
+
+
+def _load_knowledge_details(ctx: RunContext, refs: list) -> list[dict[str, Any]]:
+    """Trích xuất thông tin chi tiết (references, safe alternative, safe boundaries) từ tài liệu KB.
+
+    Duyệt qua danh sách `knowledge_refs` của finding analysis để tải tài liệu tri thức
+    tương ứng từ data/knowledge-base. Dữ liệu trích xuất bao gồm link tham chiếu chính thống,
+    giải pháp an toàn và điều kiện an toàn (not_exploitable_when) để hiển thị trên Web UI.
+    """
+    details: list[dict[str, Any]] = []
+    if not isinstance(refs, list):
+        return details
+
+    for ref in refs:
+        if not isinstance(ref, dict):
+            continue
+        path_str = str(ref.get("path") or "").strip()
+        if not path_str:
+            continue
+        score = ref.get("score")
+
+        doc_path = Path(path_str)
+        if not doc_path.is_absolute():
+            candidate = ctx.repo_root / doc_path
+            if candidate.exists():
+                doc_path = candidate
+            elif not doc_path.exists():
+                # Nếu không tìm thấy file, vẫn giữ record tối thiểu để không mất dữ liệu
+                details.append({
+                    "path": path_str,
+                    "score": score,
+                    "title": path_str,
+                    "references": [],
+                    "safe_alternative": "",
+                    "not_exploitable_when": "",
+                })
+                continue
+
+        # Thử đọc qua parser Tier 2 trước vì Tier 2 có cấu trúc chuẩn đầy đủ nhất
+        try:
+            tier2 = parse_tier2(doc_path)
+            title = ""
+            for line in tier2.body.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("# "):
+                    title = stripped.lstrip("# ").strip()
+                    break
+            if not title:
+                title = f"{tier2.canonical_category} ({tier2.id})"
+
+            details.append({
+                "path": path_str,
+                "score": score,
+                "id": tier2.id,
+                "title": title,
+                "canonical_category": tier2.canonical_category,
+                "cwe": list(tier2.cwe),
+                "safe_alternative": tier2.safe_alternative,
+                "not_exploitable_when": tier2.not_exploitable_when,
+                "exploitable_when": tier2.exploitable_when,
+                "references": list(tier2.references),
+            })
+            continue
+        except Exception:
+            pass
+
+        # Nếu không phải Tier 2 (ví dụ Tier 1 hoặc markdown tuỳ biến), đọc frontmatter tổng quát
+        try:
+            text = doc_path.read_text(encoding="utf-8")
+            raw_meta, body = _split_yaml_frontmatter(text)
+            meta = yaml.safe_load(raw_meta) if raw_meta else {}
+            if isinstance(meta, dict):
+                title = str(meta.get("title") or "").strip()
+                if not title:
+                    for line in body.splitlines():
+                        if line.strip().startswith("# "):
+                            title = line.strip().lstrip("# ").strip()
+                            break
+                refs_list = meta.get("references") or []
+                if isinstance(refs_list, str):
+                    refs_list = [refs_list]
+                elif not isinstance(refs_list, list):
+                    refs_list = []
+
+                details.append({
+                    "path": path_str,
+                    "score": score,
+                    "id": str(meta.get("id") or doc_path.stem),
+                    "title": title or doc_path.stem,
+                    "safe_alternative": str(meta.get("safe_alternative") or ""),
+                    "not_exploitable_when": str(meta.get("not_exploitable_when") or ""),
+                    "exploitable_when": str(meta.get("exploitable_when") or ""),
+                    "references": [str(r) for r in refs_list if str(r).startswith("http")],
+                })
+        except Exception:
+            details.append({
+                "path": path_str,
+                "score": score,
+                "title": path_str,
+                "references": [],
+                "safe_alternative": "",
+                "not_exploitable_when": "",
+            })
+
+    return details
+
+
 def analysis_data(ctx: RunContext, run_id: str) -> dict:
     record = load_run(ctx.runs_dir, run_id)
+    records = _read_jsonl(record.root / "analysis.jsonl")
+    for item in records:
+        if isinstance(item, dict):
+            k_refs = item.get("knowledge_refs") or []
+            item["knowledge_details"] = _load_knowledge_details(ctx, k_refs)
     return {
         "run": record,
-        "records": _read_jsonl(record.root / "analysis.jsonl"),
+        "records": records,
         "proposal": _read_json(record.root / "proposal.json", {}),
     }
 

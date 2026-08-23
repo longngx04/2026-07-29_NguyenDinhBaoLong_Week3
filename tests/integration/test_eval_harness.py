@@ -382,4 +382,32 @@ def test_repeat_majority_pass_logic():
     assert not all(per_case_fail[c.case_id] >= threshold_3 for c in cases)
 
 
+def test_tieu_chi_must_cite_path_bat_duoc_record_khong_trich_dan():
+    """Tieu chi must_cite_path bat buoc record phai trich dan dung tai lieu yeu cau."""
+    case = EvalCase(
+        case_id="13-tier2-citation",
+        description="",
+        input_data={},
+        expected={
+            "should_produce_record": True,
+            "must_cite_path": "data/knowledge-base/tier2/java-sql-statement-execute.md",
+        },
+    )
+    khong_trich = [{"title": "SQL Injection", "knowledge_refs": []}]
+    assert not evaluate(case, khong_trich).passed
+
+    co_trich = [
+        {
+            "title": "SQL Injection",
+            "knowledge_refs": [
+                {
+                    "path": "data/knowledge-base/tier2/java-sql-statement-execute.md",
+                    "score": 100.0,
+                }
+            ],
+        }
+    ]
+    assert evaluate(case, co_trich).passed
+
+
 
