@@ -9,12 +9,10 @@ import stat
 
 import pytest
 
+from project_sentinel.ingestion.merge_pipeline import normalise_finding_fields
 from project_sentinel.orchestrator.context import RunContext
 from project_sentinel.orchestrator.state import new_run
-from project_sentinel.orchestrator.steps.ingest import (
-    _normalise_finding_fields,
-    step_scan,
-)
+from project_sentinel.orchestrator.steps.ingest import step_scan
 
 RAW = {"version": "1.0", "results": [], "errors": []}
 
@@ -76,7 +74,7 @@ def test_cwe_and_owasp_are_normalised_to_lists_after_merging(tmp_path):
         {"id": "zap-1", "tool": "zap", "cwe": ["CWE-693"], "owasp": []},
         {"id": "opengrep-002", "tool": "opengrep", "cwe": None, "owasp": ""},
     ]
-    _normalise_finding_fields(findings)
+    normalise_finding_fields(findings)
     assert findings[0]["cwe"] == ["CWE-89"]
     assert findings[0]["owasp"] == []
     assert findings[1]["cwe"] == ["CWE-693"]
