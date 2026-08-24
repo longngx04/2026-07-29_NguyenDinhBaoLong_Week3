@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from project_sentinel.analysis.validators import validate_record_schema
+from project_sentinel.triage.rules import should_drop
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCHEMA = REPO_ROOT / "schemas" / "verify-verdict.schema.json"
@@ -61,3 +62,33 @@ def test_prompt_ton_tai_va_khong_hoi_muc_nghiem_trong():
     assert "uncertain" in text
     assert "true_positive" in text and "false_positive" in text
     assert "severity" not in text.lower()
+
+
+VERDICTS = ("true_positive", "false_positive", "uncertain")
+CONFIDENCES = ("high", "medium", "low")
+
+
+@pytest.mark.parametrize("verdict", VERDICTS)
+@pytest.mark.parametrize("confidence", CONFIDENCES)
+def test_bang_luat_loai(verdict, confidence):
+    """Chi mot o duy nhat trong bang 3x3 dan toi viec loai bo finding."""
+    payload = _verdict(verdict=verdict, confidence=confidence)
+    expected = verdict == "false_positive" and confidence == "high"
+    assert should_drop(payload) is expected
+
+
+def test_verdict_thieu_thi_giu():
+    assert should_drop(None) is False
+
+
+def test_verdict_rong_thi_giu():
+    assert should_drop({}) is False
+
+
+def test_verdict_sai_kieu_thi_giu():
+    assert should_drop({"verdict": ["false_positive"], "confidence": "high"}) is False
+
+
+def test_verdict_khong_phai_dict_thi_giu():
+    assert should_drop("false_positive") is False
+
