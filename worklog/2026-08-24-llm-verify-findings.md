@@ -142,7 +142,7 @@ cachedir: .pytest_cache
 rootdir: /home/longngx04/VinSOC/project_sentinel_main
 configfile: pyproject.toml
 plugins: respx-0.23.1, xdist-3.8.0, anyio-4.14.2, cov-7.1.0
-collecting ... collected 3 items                                                              
+collecting ... collected 3 items
 
 tests/integration/test_verify_step.py::test_verify_khong_bao_gio_loai_nhieu_hon_so_finding_dau_vao PASSED [ 33%]
 tests/integration/test_verify_step.py::test_verdict_luon_hop_le_theo_schema PASSED [ 66%]

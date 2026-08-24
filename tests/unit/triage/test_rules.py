@@ -91,4 +91,3 @@ def test_verdict_sai_kieu_thi_giu():
 
 def test_verdict_khong_phai_dict_thi_giu():
     assert should_drop("false_positive") is False
-

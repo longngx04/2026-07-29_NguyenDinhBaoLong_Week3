@@ -197,4 +197,3 @@ def test_main_tra_ma_loi_khi_thieu_file_sast(tmp_path, capsys):
 
     assert code == 1
     assert "error:" in capsys.readouterr().err
-
