@@ -1,5 +1,5 @@
 {# Can thiệp an toàn đã ghi được: chặn injection, che PII, chặn ngoài allowlist. #}
-{% if not events %}
+{% if not events and not scrubbed %}
 <div class="empty">
   <p class="empty-title">Không ghi nhận sự kiện nào</p>
   <p class="prose">Không có can thiệp an toàn nào xảy ra trong lần chạy này.</p>
@@ -28,15 +28,26 @@
 </article>
 {% endif %}
 
-{% if scrubbed.redactions %}
-<article class="card">
+{% if scrubbed %}
+<article class="card" data-tone="{% if scrubbed.redactions %}live{% else %}ok{% endif %}">
   <div class="card-head">
-    <p class="card-title">Dữ liệu nhạy cảm đã che</p>
-    <span class="tag">redaction</span>
+    <p class="card-title">PII guardrail</p>
+    <span class="tag" data-tone="{% if scrubbed.redactions %}live{% else %}ok{% endif %}">
+      {% if scrubbed.redactions %}đã che{% else %}đang hoạt động{% endif %}
+    </span>
   </div>
+  {% if scrubbed.redactions %}
+  <p class="prose">Dữ liệu nhạy cảm được thay bằng placeholder trước khi ghi artifact hoặc đưa vào bước sau.</p>
   <ul>
     {% for r in scrubbed.redactions %}<li><code>{{ r.kind }}</code> × <strong>{{ r.count }}</strong></li>{% endfor %}
   </ul>
+  <div class="block">
+    <h3>Nội dung an toàn sau khi che PII</h3>
+    <pre><code>{{ scrubbed.safe_text }}</code></pre>
+  </div>
+  {% else %}
+  <p class="prose">Đã kiểm tra response nhưng không phát hiện dữ liệu nhạy cảm cần che trong lần chạy này.</p>
+  {% endif %}
 </article>
 {% endif %}
 
@@ -50,6 +61,7 @@
 </article>
 {% endif %}
 
+{% if events %}
 <div class="tablewrap">
   <table>
     <thead>
@@ -72,4 +84,5 @@
     </tbody>
   </table>
 </div>
+{% endif %}
 {% endif %}

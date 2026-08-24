@@ -66,9 +66,8 @@ docker ps --format '{{.Names}}\t{{.Status}}'
 
 Phải thấy **năm** container: `webgoat`, `gateway`, `gateway-dast`, `zap`, `web`.
 
-> **Lưu ý về ZAP.** Container `zap` cần khoảng **2–4 phút** để mở API. Trong lúc đó nó hiện
-> `health: starting` rồi `unhealthy` — bình thường. Chỉ lo khi nó vẫn `unhealthy` sau 5 phút,
-> xem §5.
+> **Lưu ý về ZAP.** Container `zap` thường cần khoảng **10–30 giây** để mở API. Trong lúc
+> đó nó hiện `health: starting`. Nếu vẫn chưa `healthy` sau 90 giây, xem §5.
 
 **Bước 4 — Chạy trước một lần đầy đủ**
 
@@ -345,21 +344,24 @@ phải giới hạn đúng/sai.
 
 ### Container `zap` mãi `unhealthy`
 
-ZAP cần 2–4 phút để mở API. Nếu quá 5 phút:
+ZAP thường mở API trong 10–30 giây. Nếu quá 90 giây:
 
 ```bash
+docker logs --tail 100 sentinel-sec-zap-1
 docker exec sentinel-sec-zap-1 sh -c 'netstat -ltn | grep 8090' || echo "chua nghe 8090"
 ```
 
-Nếu không nghe cổng 8090, ZAP đã bind nhầm một cổng ngẫu nhiên — lỗi đã biết, chưa tìm ra
-nguyên nhân gốc. Cách xử lý:
+Lệnh khởi động phải có `-silent`. Cờ này ngăn ZAP tự kiểm tra/tải hàng loạt add-on trước
+khi bind API; các add-on cần cho scan vẫn được client cài chủ động sau đó. Nếu container
+được tạo từ cấu hình cũ, dựng lại riêng ZAP:
 
 ```bash
 docker compose --profile dast up -d --force-recreate zap
 ```
 
-Demo vẫn tiếp tục được: DAST bị bỏ qua nhưng luồng **không** hỏng, chỉ ra 23 finding SAST
-thay vì 37. Nói thẳng điều đó nếu người xem hỏi.
+Nếu vẫn lỗi, kiểm tra digest ảnh ZAP đang dùng và mạng ra ngoài trước khi đổi phiên bản.
+Việc cập nhật ảnh/add-on phải được thực hiện có kiểm soát và chạy lại live test. Khi buộc
+phải demo SAST-only, nói rõ DAST chưa chạy; không trình bày kết quả đó như một lượt đầy đủ.
 
 ### `make up` báo `address already in use`
 

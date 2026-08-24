@@ -140,9 +140,7 @@ def test_zap_api_never_reaches_the_host(compose):
 
 
 def test_zap_runs_as_a_daemon_with_a_key_from_the_environment(compose):
-    """Command phai o dang DANH SACH. Dang chuoi mot dong bi tach nhap nhang khien
-    ZAP bo qua `-port` va roi ve mot cong ngau nhien tren localhost — quan sat duoc
-    that: no nghe 127.0.0.1:42225 thay vi 0.0.0.0:8090."""
+    """Command phai o dang danh sach de moi tham so den ZAP nguyen ven."""
     command = compose["services"]["zap"].get("command")
     assert isinstance(command, list), f"command phai la danh sach, dang la {type(command)}"
     assert "-daemon" in command
@@ -150,6 +148,13 @@ def test_zap_runs_as_a_daemon_with_a_key_from_the_environment(compose):
     assert "api.key=${SENTINEL_ZAP_API_KEY}" in command, (
         "Khoa API phai lay tu bien moi truong, khong duoc la hang trong file"
     )
+
+
+def test_zap_does_not_update_addons_before_binding_its_api(compose):
+    """Cold start khong duoc bi chan boi dot auto-update addon."""
+    command = compose["services"]["zap"]["command"]
+    assert "-silent" in command
+    assert "-addonupdate" not in command
 
 
 def test_zap_still_only_ever_targets_the_dast_gateway(compose):
@@ -180,9 +185,7 @@ def test_zap_command_never_uses_a_run_and_exit_action(compose):
 
 
 def test_zap_healthcheck_proves_the_api_is_actually_listening(compose):
-    """Quan sat duoc: ZAP thinh thoang bo qua `-port` va roi ve mot cong ngau nhien
-    tren localhost. Khong co healthcheck thi container bao "Up" trong khi API chet,
-    va client chi phat hien sau khi cho het han gio."""
+    """Container chi healthy khi API that su nhan request tren cong co dinh."""
     health = compose["services"]["zap"].get("healthcheck")
     assert health, "zap phai co healthcheck"
     probe = " ".join(health["test"])

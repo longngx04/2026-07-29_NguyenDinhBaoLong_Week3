@@ -40,9 +40,9 @@ class ZapConfig:
     dast_header: str = "X-Sentinel-DAST-Key"
     plan_path: str = DEFAULT_PLAN
     gateway_log_path: Path = DEFAULT_GATEWAY_LOG
-    # Do duoc: ZAP 2.17 mat ~130s de mo API (no kiem 24 addon cap nhat luc khoi
-    # dong). Mac dinh 120s tung lam client bo cuoc ngay truoc khi daemon san sang.
-    ready_timeout_s: float = 300.0
+    # Daemon chay `-silent` de khong tai addon truoc khi bind API; cold start do
+    # duoc khoang 11s. Cho toi da 90s de du suc cho may cham nhung van fail som.
+    ready_timeout_s: float = 90.0
     plan_timeout_s: float = 600.0
     poll_interval_s: float = 2.0
     # ZAP ghi bao cao vao mount cua no; container web doc cung thu muc do qua

@@ -74,8 +74,33 @@ def test_events_screen_shows_before_and_after_of_scrubbing(client, record):
     """Cảnh demo: nội dung độc bị cắt, PII bị che."""
     http, _ = client
     body = http.get(f"/runs/{record.run_id}/events").text
+    assert "PII guardrail" in body
+    assert "đã che" in body
     assert "[REMOVED_INJECTION_ATTEMPT]" in body
     assert "[REDACTED_EMAIL]" in body
+
+
+def test_events_screen_shows_pii_guardrail_when_response_is_clean(client):
+    http, ctx = client
+    clean = new_run(ctx.runs_dir)
+    (clean.root / "scrubbed.json").write_text(
+        json.dumps(
+            {
+                "original_bytes": 8,
+                "injection": {"verdict": "clean", "matches": []},
+                "redactions": [],
+                "safe_text": "response",
+            }
+        ),
+        encoding="utf-8",
+    )
+    save_run(clean)
+
+    body = http.get(f"/runs/{clean.run_id}/events").text
+    assert "PII guardrail" in body
+    assert "đang hoạt động" in body
+    assert "không phát hiện dữ liệu nhạy cảm" in body
+    assert "Không ghi nhận sự kiện nào" not in body
 
 
 def test_events_screen_shows_the_blocked_endpoint(client, record):

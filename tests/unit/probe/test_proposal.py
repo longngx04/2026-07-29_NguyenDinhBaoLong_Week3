@@ -45,6 +45,23 @@ def test_allowlisted_objective_is_accepted(allowlist):
     assert decision.probe.payload_kind == "long_string"
 
 
+def test_objective_must_match_runtime_evidence_when_supplied(allowlist):
+    accepted = validate_objective(
+        _objective(),
+        allowlist,
+        evidence_locations=["http://gateway-dast:8081/WebGoat/attack"],
+    )
+    rejected = validate_objective(
+        _objective(),
+        allowlist,
+        evidence_locations=["http://gateway-dast:8081/WebGoat/login"],
+    )
+
+    assert accepted.accepted is True
+    assert rejected.accepted is False
+    assert "runtime evidence" in rejected.reason
+
+
 def test_null_objective_is_rejected_without_error(allowlist):
     decision = validate_objective(None, allowlist)
     assert not decision.accepted

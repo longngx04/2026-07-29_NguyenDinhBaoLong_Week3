@@ -113,11 +113,12 @@ xuôi thì không có cách xác minh tự động.
   `expose` chứ không `ports` nên không có cổng host, bắt buộc API key, và chỉ nằm trên
   mạng nội bộ `sentinel-net`. Có test khoá cả ba trong
   `tests/unit/infra/test_compose_invariants.py`.
-- **ZAP daemon đôi khi bỏ qua `-port` và rơi về một cổng ngẫu nhiên trên localhost.**
-  Quan sát được trên máy phát triển: cùng một lệnh, có lần bind `0.0.0.0:8090`, có lần
-  bind `127.0.0.1:33397`. Khi rơi vào trường hợp sau, DAST bị bỏ qua và lần chạy vẫn
-  hoàn thành với chỉ finding SAST. Healthcheck của service `zap` kiểm đúng điều này nên
-  lỗi hiện ra ở `docker compose ps` thay vì im lặng. Chưa tìm được nguyên nhân gốc.
+- **ZAP từng treo cold start ở bước auto-update add-on trước khi bind API.** Quan sát trên
+  ảnh đã pin: ZAP phát hiện 24 add-on mới rồi chạy nhiều luồng tải, dùng khoảng 700–800%
+  CPU nhưng chưa nghe cổng 8090. Service hiện chạy với `-silent` để chặn request tự phát
+  khi khởi động; cùng ảnh đó mở API trong khoảng 11 giây ở lần đo sửa lỗi. Đổi lại, cập
+  nhật ảnh/add-on phải là thao tác có chủ đích và luôn kèm live test. Healthcheck vẫn xác
+  nhận API thật sự nghe trên 8090 thay vì chỉ tin trạng thái tiến trình.
 - **Bốn rule passive 10049, 10063, 10110, 90004 nằm trong bộ `pscanrulesBeta`,** không có
   sẵn trong ảnh ZAP. Client tự cài chúng qua API mỗi lần quét. Cài được thì kết quả khớp
   luồng `zap-baseline.py` cũ; không có mạng thì quét vẫn chạy nhưng thiếu bốn cảnh báo đó.
