@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 STEP_NAMES: tuple[str, ...] = (
-    "scan", "normalize", "analyze", "propose",
+    "scan", "normalize", "verify", "analyze", "propose",
     "approval", "probe", "scrub", "report", "finalize",
 )
 
@@ -37,6 +37,7 @@ DEFAULT_STEP_BUDGET_S = 30
 STEP_BUDGET_S: dict[str, int] = {
     "scan": 180,      # dựng image + OpenGrep + ZAP spider và passive scan (~3 phút)
     "normalize": 30,
+    "verify": 360,    # gọi LLM cho từng finding, có thử lại (~6 phút)
     "analyze": 360,   # gọi LLM theo nhóm, có thử lại (~6 phút)
     "propose": 30,
     "probe": 30,
@@ -54,6 +55,7 @@ class RunState(str, Enum):
     IDLE = "IDLE"
     SCANNING = "SCANNING"
     NORMALIZING = "NORMALIZING"
+    VERIFYING = "VERIFYING"
     ANALYZING = "ANALYZING"
     AWAITING_APPROVAL = "AWAITING_APPROVAL"
     PROBING = "PROBING"
@@ -138,6 +140,21 @@ class RunRecord:
         if not isinstance(data, dict):
             raise ValueError(f"Dữ liệu bản ghi không phải dict: {type(data)}")
         known = {f.name for f in dataclasses.fields(StepRecord)}
+        stored = {
+            item["name"]: StepRecord(**{k: v for k, v in item.items() if k in known})
+            for item in data.get("steps", [])
+            if isinstance(item, dict) and isinstance(item.get("name"), str)
+        }
+        # Run da co tren dia duoc ghi khi luong con 9 buoc. Bo khuyet buoc thieu
+        # thay vi de `record.step("verify")` no KeyError, va danh lai index theo
+        # STEP_NAMES de thu tu hien thi luon dung.
+        steps = [
+            dataclasses.replace(
+                stored.get(name, StepRecord(index=index, name=name, status="skipped")),
+                index=index,
+            )
+            for index, name in enumerate(STEP_NAMES, 1)
+        ]
         return cls(
             run_id=data["run_id"],
             root=root,
@@ -145,11 +162,7 @@ class RunRecord:
             created_at=data["created_at"],
             updated_at=data["updated_at"],
             error=data.get("error"),
-            steps=[
-                StepRecord(**{k: v for k, v in item.items() if k in known})
-                for item in data.get("steps", [])
-                if isinstance(item, dict)
-            ],
+            steps=steps,
         )
 
 

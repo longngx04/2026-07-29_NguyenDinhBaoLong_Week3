@@ -56,7 +56,7 @@ def test_polling_endpoint_returns_compact_json(client):
     assert data["run_id"] == record.run_id
     assert data["state"] == "ANALYZING"
     assert data["terminal"] is False
-    assert len(data["steps"]) == 9
+    assert len(data["steps"]) == 10
     assert data["steps"][0]["status"] == "done"
 
 

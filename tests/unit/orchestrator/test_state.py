@@ -14,17 +14,17 @@ from project_sentinel.orchestrator.state import (
 )
 
 
-def test_nine_steps_in_order():
+def test_ten_steps_in_order():
     assert STEP_NAMES == (
-        "scan", "normalize", "analyze", "propose",
+        "scan", "normalize", "verify", "analyze", "propose",
         "approval", "probe", "scrub", "report", "finalize",
     )
 
 
-def test_new_run_starts_idle_with_nine_pending_steps(tmp_path):
+def test_new_run_starts_idle_with_ten_pending_steps(tmp_path):
     record = new_run(tmp_path)
     assert record.state is RunState.IDLE
-    assert len(record.steps) == 9
+    assert len(record.steps) == 10
     assert all(step.status == "pending" for step in record.steps)
 
 
