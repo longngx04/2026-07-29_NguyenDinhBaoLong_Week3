@@ -86,19 +86,25 @@ normalize-zap:
 	  --input artifacts/raw/zap.json \
 	  --output artifacts/normalized/zap-findings.json
 
-scan-all: scan-opengrep normalize scan-zap normalize-zap
-	@$(PYTHON) -m project_sentinel.ingestion.merge_findings \
-	  --input artifacts/normalized/findings.json \
-	  --input artifacts/normalized/zap-findings.json \
-	  --output artifacts/normalized/all-findings.json
+scan-all: scan-opengrep scan-zap normalize
 
 dast-test: dast
 	@$(PYTHON) -m pytest tests/integration/test_zap_gateway_live.py -v
 
+# Chay OpenGrep normalizer roi tron voi DAST neu co alert ZAP. Truoc day target
+# nay ghi thang ra findings.json va chi co SAST, nen `make analyze` — von lay
+# findings.json lam mac dinh — chua bao gio nhin thay mot finding DAST nao.
 normalize:
 	@$(PYTHON) -m project_sentinel.ingestion.normalizer \
 		--input artifacts/raw/opengrep.json \
-		--output artifacts/normalized/findings.json
+		--output artifacts/normalized/sast-findings.json
+	@$(PYTHON) -m project_sentinel.ingestion.merge_pipeline \
+		--sast artifacts/normalized/sast-findings.json \
+		--zap-alerts artifacts/raw/zap.json \
+		--gateway-log artifacts/dast/gateway-access.log \
+		--output artifacts/normalized/findings.json \
+		--project-root .
+
 
 search:
 	@test -n "$(Q)" || (printf '%s\n' 'Usage: make search Q='\''SQL Injection'\''' >&2; exit 1)

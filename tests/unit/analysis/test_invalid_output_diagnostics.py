@@ -150,6 +150,36 @@ def test_objective_error_does_not_trigger_retry(tmp_path):
     assert outcome.invalid_responses_observed == 1
 
 
+def test_objective_without_runtime_route_is_nulled_before_propose(tmp_path):
+    """SAST source location không được biến thành endpoint do LLM tự đoán."""
+    from project_sentinel.gateway.allowlist import Allowlist
+
+    config = AppConfig(
+        project_root=tmp_path,
+        schema_path=SCHEMA_PATH,
+        allowlist_path=ALLOWLIST_PATH,
+        validation_max_retries=1,
+    )
+    allowlist = Allowlist.from_json(ALLOWLIST_PATH)
+    group = _make_group(group_key="grp-route", finding_id="f-real")
+    record = _valid_record(group_key="grp-route", finding_id="f-real")
+    record["verification_objective"] = {
+        "endpoint_hint": "POST /WebGoat/attack",
+        "payload_kind": "long_string",
+        "description": "test",
+        "rationale": "test",
+    }
+
+    outcome = _analyze_one_group(group, config, ReplayProvider([record]), allowlist)
+
+    assert outcome.llm_call_count == 1
+    assert outcome.retry_count == 0
+    assert outcome.record is not None
+    assert outcome.record["verification_objective"] is None
+    assert outcome.invalid_objective_count == 1
+    assert any("runtime evidence" in item for item in outcome.validation_errors)
+
+
 def test_schema_or_provenance_error_still_triggers_retry(tmp_path):
     """A response failing schema or provenance must still trigger retry."""
     from project_sentinel.gateway.allowlist import Allowlist

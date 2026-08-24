@@ -76,11 +76,13 @@ services:
     image: ghcr.io/zaproxy/zaproxy@sha256:8d387b1a63e3425beef4846e39719f5af2a787753af2d8b6558c6257d7a577a2
     # Daemon chay suot vong doi stack. Container `web` khong co Docker nen no
     # khong the `docker compose run zap`; no dieu khien daemon nay qua API.
-    # Dang DANH SACH, khong dung folded scalar `>`: chuoi mot dong bi tach nhap
-    # nhang khien ZAP bo qua `-port` va roi ve mot cong ngau nhien tren localhost.
+    # `-silent` chan cac request tu phat luc khoi dong, dac biet la dot kiem/cap
+    # nhat addon truoc khi API bind. Addon can cho scan van duoc client cai ro rang
+    # qua API sau khi daemon da san sang.
     command:
       - zap.sh
       - -daemon
+      - -silent
       - -host
       - 0.0.0.0
       - -port
@@ -95,16 +97,15 @@ services:
     # tan cong, no khong duoc xuat hien tren bat ky giao dien host nao.
     expose:
       - "8090"
-    # Quan sat duoc: ZAP thinh thoang BO QUA `-port` va roi ve mot cong ngau nhien
-    # tren localhost (vd 127.0.0.1:33397). Khong co healthcheck thi container van
-    # bao "Up" con client thi cho het 300s roi bao loi mo ho. Healthcheck nay bat
-    # dung dieu can bat: API co that su nghe o 8090 khong.
+    # Healthcheck xac nhan dung thu can cho DAST: API da nghe o 8090 va chap nhan
+    # khoa. Voi `-silent`, cold start thuong hoan tat trong vai chuc giay; gioi han
+    # nay giup loi that su fail ro rang thay vi treo nhieu phut.
     healthcheck:
       test: ["CMD-SHELL", "curl -sf \"http://127.0.0.1:8090/JSON/core/view/version/?apikey=$$SENTINEL_ZAP_API_KEY\" || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 30
-      start_period: 60s
+      retries: 9
+      start_period: 20s
     environment:
       - SENTINEL_ZAP_API_KEY=${SENTINEL_ZAP_API_KEY:-}
       - ZAP_AUTH_HEADER=X-Sentinel-DAST-Key

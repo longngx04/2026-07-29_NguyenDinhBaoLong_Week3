@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VerifyVerdict",
+  "description": "Ket luan cua buoc verify ve MOT finding tho, truoc khi phan tich. Khong chua muc nghiem trong: do la viec cua security-analysis-record.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "finding_id",
+    "verdict",
+    "confidence",
+    "rationale",
+    "evidence_seen"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
+    "finding_id": {
+      "description": "Phai khop truong `id` cua mot finding CO THAT trong findings.json.",
+      "type": "string",
+      "minLength": 1
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["true_positive", "false_positive", "uncertain"]
+    },
+    "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+    "rationale": {
+      "description": "Mot cau. KHONG chua payload khai thac, lenh shell hay chuoi SQL pha huy.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "evidence_seen": {
+      "description": "`source` khi doc duoc doan ma; `metadata_only` cho finding DAST chi co metadata alert.",
+      "type": "string",
+      "enum": ["source", "metadata_only"]
+    }
+  }
+}

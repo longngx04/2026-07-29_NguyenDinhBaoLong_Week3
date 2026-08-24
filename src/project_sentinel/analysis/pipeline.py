@@ -111,7 +111,27 @@ def _allowed_endpoints_hint(allowlist: Optional[Allowlist]) -> str:
     )
 
 
-def _objective_error(record: Dict[str, Any], allowlist: Optional[Allowlist]) -> Optional[str]:
+def _runtime_evidence_locations(group: Any) -> tuple[str, ...]:
+    """Lấy route đã quan sát của đúng finding group, không suy diễn từ code."""
+    locations: list[str] = []
+    for location in getattr(group, "locations", []) or []:
+        value = getattr(location, "file", "")
+        if isinstance(value, str) and value:
+            locations.append(value)
+
+    for finding in getattr(group, "findings", []) or []:
+        runtime = getattr(finding, "runtime_evidence", None)
+        if runtime is None and isinstance(finding, dict):
+            runtime = finding.get("runtime_evidence")
+        observed = runtime.get("observed") if isinstance(runtime, dict) else None
+        if isinstance(observed, str) and observed:
+            locations.append(observed)
+    return tuple(locations)
+
+
+def _objective_error(
+    record: Dict[str, Any], allowlist: Optional[Allowlist], group: Any
+) -> Optional[str]:
     """Kiểm `verification_objective` NGAY sau LLM, không đợi tới bước propose.
 
     Prompt bắt Agent chỉ chọn endpoint có thật trong `allowed_endpoints`, nhưng
@@ -124,10 +144,14 @@ def _objective_error(record: Dict[str, Any], allowlist: Optional[Allowlist]) -> 
     objective = record.get("verification_objective")
     if objective is None or allowlist is None:
         return None
-    decision = validate_objective(objective, allowlist)
+    decision = validate_objective(
+        objective,
+        allowlist,
+        evidence_locations=_runtime_evidence_locations(group),
+    )
     if decision.accepted:
         return None
-    return f"verification_objective bị allowlist từ chối: {decision.reason}"
+    return f"verification_objective bị policy từ chối: {decision.reason}"
 
 
 @dataclass
@@ -330,7 +354,7 @@ def _validate_response(
         schema=None if is_schema_valid else schema_err,
         provenance=[] if is_prov_valid else prov_errs,
         unsafe=list(scan_unsafe_output(record_dict)),
-        objective=_objective_error(record_dict, allowlist),
+        objective=_objective_error(record_dict, allowlist, group),
     )
 
 

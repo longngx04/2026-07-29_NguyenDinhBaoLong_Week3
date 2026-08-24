@@ -21,8 +21,55 @@ from project_sentinel.orchestrator.steps.common import (
 )
 from project_sentinel.probe.proposal import SafeProbe, validate_objective
 
+def _candidate_evidence_locations(
+    entry: dict[str, Any],
+    evidence_by_finding_id: dict[str, tuple[str, ...]],
+) -> tuple[str, ...]:
+    """Chỉ trả URL/route đã thuộc finding mà analysis record đang nói tới."""
+    locations: list[str] = []
+    for location in entry.get("locations") or []:
+        if isinstance(location, dict) and isinstance(location.get("url"), str):
+            locations.append(location["url"])
+
+    raw_ids = entry.get("source_finding_ids")
+    if isinstance(raw_ids, list):
+        for finding_id in raw_ids:
+            if isinstance(finding_id, str):
+                locations.extend(evidence_by_finding_id.get(finding_id, ()))
+    return tuple(locations)
+
+
+def _evidence_locations_by_finding_id(record: RunRecord) -> dict[str, tuple[str, ...]]:
+    """Đọc route runtime từ input của analyze để validate lại trước probe."""
+    source = record.root / "findings.verified.json"
+    if not source.exists():
+        source = record.root / "findings.json"
+    try:
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        findings = payload.get("findings") if isinstance(payload, dict) else None
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(findings, list):
+        return {}
+
+    result: dict[str, tuple[str, ...]] = {}
+    for finding in findings:
+        if not isinstance(finding, dict) or not isinstance(finding.get("id"), str):
+            continue
+        locations: list[str] = []
+        raw_location = finding.get("file_or_url") or finding.get("file")
+        if isinstance(raw_location, str):
+            locations.append(raw_location)
+        runtime = finding.get("runtime_evidence")
+        observed = runtime.get("observed") if isinstance(runtime, dict) else None
+        if isinstance(observed, str):
+            locations.append(observed)
+        result[finding["id"]] = tuple(locations)
+    return result
+
+
 def _choose_objective(
-    candidates: list[tuple[str | None, tuple[str, ...], dict[str, Any]]],
+    candidates: list[tuple[str | None, tuple[str, ...], dict[str, Any], tuple[str, ...]]],
     allowlist: Allowlist,
 ):
     """Chọn đề xuất ít xâm lấn nhất trong số được allowlist duyệt.
@@ -35,24 +82,34 @@ def _choose_objective(
     Trả về `(analysis_id, finding_ids, objective, decision)`.
     """
     evaluated = [
-        (analysis_id, finding_ids, objective, validate_objective(objective, allowlist))
-        for analysis_id, finding_ids, objective in candidates
+        (
+            analysis_id,
+            finding_ids,
+            objective,
+            evidence_locations,
+            validate_objective(
+                objective, allowlist, evidence_locations=evidence_locations
+            ),
+        )
+        for analysis_id, finding_ids, objective, evidence_locations in candidates
     ]
-    accepted = [item for item in evaluated if item[3].accepted]
+    accepted = [item for item in evaluated if item[4].accepted]
     if accepted:
-        return next(
+        selected = next(
             (
                 item
                 for item in accepted
                 # probe luôn khác None khi decision.accepted, nhưng viết rõ ra
                 # để bất biến này được kiểm tra thay vì chỉ được tin.
-                if item[3].probe is not None
-                and item[3].probe.payload_kind == "empty_value"
+                if item[4].probe is not None
+                and item[4].probe.payload_kind == "empty_value"
             ),
             accepted[0],
         )
+        return selected[0], selected[1], selected[2], selected[4]
     if evaluated:
-        return evaluated[0]
+        selected = evaluated[0]
+        return selected[0], selected[1], selected[2], selected[4]
     return None, (), None, validate_objective(None, allowlist)
 
 
@@ -68,7 +125,10 @@ def step_propose(record: RunRecord, ctx: RunContext) -> RunRecord:
 
     # (analysis_id, finding_ids, objective) — finding_ids đi cùng đề xuất để
     # proposal.json nói được nó định kiểm chứng finding nào, không chỉ nhóm nào.
-    candidates: list[tuple[str | None, tuple[str, ...], dict[str, Any]]] = []
+    candidates: list[
+        tuple[str | None, tuple[str, ...], dict[str, Any], tuple[str, ...]]
+    ] = []
+    evidence_by_finding_id = _evidence_locations_by_finding_id(record)
     for line in source.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
@@ -92,6 +152,7 @@ def step_propose(record: RunRecord, ctx: RunContext) -> RunRecord:
                     entry.get("analysis_id"),
                     entry_finding_ids,
                     entry["verification_objective"],
+                    _candidate_evidence_locations(entry, evidence_by_finding_id),
                 )
             )
 
@@ -113,7 +174,11 @@ def step_propose(record: RunRecord, ctx: RunContext) -> RunRecord:
             candidates, allowlist
         )
     accepted_count = sum(
-        1 for _, _, item in candidates if validate_objective(item, allowlist).accepted
+        1
+        for _, _, item, evidence_locations in candidates
+        if validate_objective(
+            item, allowlist, evidence_locations=evidence_locations
+        ).accepted
     )
 
     append_log(

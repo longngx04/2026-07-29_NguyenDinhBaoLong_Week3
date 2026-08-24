@@ -6,7 +6,9 @@ không qua được hàm này.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 from project_sentinel.gateway.allowlist import Allowlist
 from project_sentinel.probe.payload_kinds import PAYLOAD_KIND_TO_TYPE
@@ -33,10 +35,33 @@ def _reject(reason: str) -> ProposalDecision:
     return ProposalDecision(accepted=False, probe=None, reason=reason)
 
 
+def _observed_paths(locations: Iterable[str]) -> frozenset[str]:
+    """Chuẩn hoá URL/path trong evidence về path nội bộ được phép probe."""
+    paths: set[str] = set()
+    for location in locations:
+        if not isinstance(location, str):
+            continue
+        parsed = urlsplit(location)
+        if parsed.scheme in {"http", "https"} and parsed.netloc and parsed.path:
+            paths.add(parsed.path)
+        elif location.startswith("/") and "?" not in location:
+            paths.add(location)
+    return frozenset(paths)
+
+
 def validate_objective(
-    objective: dict | None, allowlist: Allowlist
+    objective: dict | None,
+    allowlist: Allowlist,
+    *,
+    evidence_locations: Iterable[str] | None = None,
 ) -> ProposalDecision:
-    """Kiểm tra một verification_objective do agent sinh ra."""
+    """Kiểm tra một verification_objective do agent sinh ra.
+
+    Khi caller có evidence của finding, endpoint phải xuất hiện trong chính
+    evidence đó. ``None`` chỉ dành cho các caller không gắn với finding, như
+    operator override; một danh sách rỗng là bằng chứng rằng không có route
+    nào để agent được phép suy diễn.
+    """
     if objective is None:
         return _reject("Agent không đề xuất bước kiểm chứng nào.")
     if not isinstance(objective, dict):
@@ -75,6 +100,11 @@ def validate_objective(
     if not allowlist.is_allowed(method, path, payload_kind=kind, enforce_template=True):
         return _reject(
             f"payload_kind '{kind}' chưa được review cho '{method} {path}'."
+        )
+
+    if evidence_locations is not None and path not in _observed_paths(evidence_locations):
+        return _reject(
+            f"'{method} {path}' không xuất hiện trong URL runtime evidence của finding."
         )
 
     return ProposalDecision(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from pathlib import Path
 
 from project_sentinel.analysis.pipeline import run_pipeline
 from project_sentinel.config import AppConfig
@@ -113,30 +114,9 @@ def step_scan(record: RunRecord, ctx: RunContext) -> RunRecord:
     return record
 
 
-def _normalise_finding_fields(findings: list[dict]) -> None:
-    """Ep cwe/owasp ve list cho moi finding, sua tai cho.
-
-    zap_normalizer cho list, normalizer.py cua OpenGrep cho gia tri vo huong.
-    De ca hai hinh dang vao findings.json thi moi thu doc no ve sau — prompt,
-    validator, report — deu phai xu ly hai truong hop.
-    """
-    for item in findings:
-        for field in ("cwe", "owasp"):
-            value = item.get(field)
-            if value is None or value == "":
-                item[field] = []
-            elif not isinstance(value, list):
-                item[field] = [str(value)]
-
-
 def step_normalize(record: RunRecord, ctx: RunContext) -> RunRecord:
     """Bước 2 — chuẩn hoá về định dạng chung, ghi findings.json."""
-    from project_sentinel.analysis.correlation import (
-        correlate,
-        parse_gateway_access_log,
-    )
-    from project_sentinel.ingestion.merge_findings import merge_files
-    from project_sentinel.ingestion.zap_normalizer import run_normalize
+    from project_sentinel.ingestion.merge_pipeline import merge_normalized
 
     source = record.root / "raw.json"
     if not source.exists():
@@ -157,91 +137,55 @@ def step_normalize(record: RunRecord, ctx: RunContext) -> RunRecord:
     if not target.exists():
         raise StepFailure("Bước normalize không sinh ra findings.json")
 
-    try:
-        payload = json.loads(target.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise StepFailure(f"findings.json không phải JSON hợp lệ: {exc}") from exc
-
-    if not isinstance(payload, dict):
-        raise StepFailure("findings.json không phải JSON object — không đúng định dạng")
-
-    findings = payload.get("findings", [])
-    if not isinstance(findings, list):
-        raise StepFailure("findings.json thiếu mảng findings")
-
-    zap_added = 0
     alerts_path = record.root / "zap-alerts.json"
-    if alerts_path.exists():
-        # Dữ liệu từ ZAP là dữ liệu KHÔNG đáng tin chảy vào prompt LLM; siết quyền 0600 ngay trước khi đọc.
-        try:
-            alerts_path.chmod(0o600)
-        except OSError as exc:
-            # Tệp do container ZAP tạo; nếu UID host khác UID container thì không
-            # chmod được. Ghi cảnh báo chứ KHÔNG làm sập lần chạy.
-            append_log(
-                record.root,
-                step="normalize",
-                level="warn",
-                message=f"Khong siet duoc quyen zap-alerts.json: {exc}",
-            )
-        zap_normalized = record.root / "zap-findings.json"
-        zap_added = len(run_normalize(alerts_path, zap_normalized))
+    try:
+        counts = merge_normalized(
+            sast_findings=target,
+            zap_alerts=alerts_path if alerts_path.exists() else None,
+            gateway_log=record.root / "gateway-access.log",
+            output=target,
+            project_root=ctx.repo_root,
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise StepFailure(f"Không trộn được finding SAST và DAST: {exc}") from exc
+
+    if counts["zap_findings"]:
         append_log(
             record.root,
             step="normalize",
             level="info",
-            message=f"Normalized {zap_added} ZAP findings -> {zap_normalized}",
+            message=(
+                f"Normalized {counts['zap_findings']} ZAP findings "
+                f"-> {record.root / 'zap-findings.json'}"
+            ),
         )
-        # Ghi ra file thu ba roi doi ten, KHONG merge_files([target, x], target):
-        # doc va ghi cung mot duong dan chi dung duoc nho merge_files tinh co doc
-        # het truoc khi ghi. Dua vao mot chi tiet noi tai nhu vay la mong manh.
-        combined = record.root / ".findings.merged.json"
-        merge_files([target, zap_normalized], combined)
-        combined.replace(target)
-        payload = json.loads(target.read_text(encoding="utf-8"))
-        # Hai normalizer dung hai hinh dang cho cung mot truong: zap_normalizer
-        # cho cwe/owasp la list, normalizer.py cua OpenGrep cho gia tri vo huong.
-        # Chuan hoa ve list ngay sau khi tron, vi list la dang tong quat hon va
-        # moi thu doc findings.json sau day chi con mot hinh dang de xu ly.
-        _normalise_finding_fields(payload["findings"])
-        payload["findings"] = correlate(
-            payload["findings"],
-            parse_gateway_access_log(record.root / "gateway-access.log"),
-            project_root=ctx.repo_root,
-        )
-        target.write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-        )
-        findings = payload["findings"]
 
-    correlated = sum(
-        1
-        for f in findings
-        if (f.get("runtime_evidence") or {}).get("strength", "no_route") != "no_route"
-    )
-    record.mark_step(
-        "normalize",
-        "done",
-        detail={
-            "findings": len(findings),
-            "zap_findings": zap_added,
-            "correlated": correlated,
-        },
-    )
+    record.mark_step("normalize", "done", detail=counts)
     append_log(
         record.root,
         step="normalize",
         level="info",
         message="Chuẩn hoá xong",
-        findings=len(findings),
+        findings=counts["findings"],
     )
     return record
 
 
 
+def _analysis_input(root: Path) -> Path:
+    """Đường vào của analyze: danh sách đã lọc nếu có, không thì findings gốc.
+
+    Sự vắng mặt của `findings.verified.json` là tín hiệu suy giảm DUY NHẤT của
+    bước verify. `verify.jsonl` có thể tồn tại dở dang khi bước hỏng giữa chừng,
+    nên không được đọc nó để suy ra điều gì.
+    """
+    verified = root / "findings.verified.json"
+    return verified if verified.exists() else root / "findings.json"
+
+
 def step_analyze(record: RunRecord, ctx: RunContext) -> RunRecord:
-    """Bước 3 — agent đọc findings, tra kho tri thức, sinh báo cáo JSONL."""
-    source = record.root / "findings.json"
+    """Bước 4 — agent đọc findings, tra kho tri thức, sinh báo cáo JSONL."""
+    source = _analysis_input(record.root)
     if not source.exists():
         raise StepFailure(
             "Không có findings.json để phân tích; bước normalize chưa chạy"

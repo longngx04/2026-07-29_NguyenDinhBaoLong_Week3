@@ -24,6 +24,11 @@ def _write_analysis(record, objective):
         "severity": "high",
         "verification_objective": objective,
     }
+    if isinstance(objective, dict):
+        hint = str(objective.get("endpoint_hint") or "")
+        parts = hint.split(" ", maxsplit=1)
+        if len(parts) == 2 and parts[1].startswith("/"):
+            line["locations"] = [{"url": f"http://gateway-dast:8081{parts[1]}"}]
     (record.root / "analysis.jsonl").write_text(
         json.dumps(line, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -132,6 +137,7 @@ def test_first_record_with_an_objective_wins(ctx):
         {"analysis_id": "analysis-aaaa", "verification_objective": None},
         {
             "analysis_id": "analysis-bbbb",
+            "locations": [{"url": "http://gateway-dast:8081/WebGoat/attack"}],
             "verification_objective": {
                 "description": "d",
                 "endpoint_hint": "POST /WebGoat/attack",
@@ -192,6 +198,7 @@ def _record_with_two_objectives(ctx):
     lines = [
         {
             "analysis_id": "a1",
+            "locations": [{"url": "http://gateway-dast:8081/WebGoat/admin"}],
             "verification_objective": {
                 "description": "d1",
                 "endpoint_hint": "GET /WebGoat/admin",
@@ -201,6 +208,7 @@ def _record_with_two_objectives(ctx):
         },
         {
             "analysis_id": "a2",
+            "locations": [{"url": "http://gateway-dast:8081/WebGoat/attack"}],
             "verification_objective": {
                 "description": "d2",
                 "endpoint_hint": "POST /WebGoat/attack",
@@ -252,6 +260,7 @@ def test_empty_value_is_preferred_over_long_string(ctx):
     lines = [
         {
             "analysis_id": "a-long",
+            "locations": [{"url": "http://gateway-dast:8081/WebGoat/attack"}],
             "verification_objective": {
                 "description": "d",
                 "endpoint_hint": "POST /WebGoat/attack",
@@ -261,6 +270,7 @@ def test_empty_value_is_preferred_over_long_string(ctx):
         },
         {
             "analysis_id": "a-empty",
+            "locations": [{"url": "http://gateway-dast:8081/WebGoat/attack"}],
             "verification_objective": {
                 "description": "d",
                 "endpoint_hint": "POST /WebGoat/attack",
@@ -285,6 +295,7 @@ def test_post_is_used_when_no_get_objective_is_allowed(ctx):
     record = new_run(ctx.runs_dir)
     line = {
         "analysis_id": "a-post",
+        "locations": [{"url": "http://gateway-dast:8081/WebGoat/attack"}],
         "verification_objective": {
             "description": "d",
             "endpoint_hint": "POST /WebGoat/attack",
@@ -300,6 +311,28 @@ def test_post_is_used_when_no_get_objective_is_allowed(ctx):
     payload = json.loads((record.root / "proposal.json").read_text(encoding="utf-8"))
     assert payload["accepted"] is True
     assert payload["probe"]["method"] == "POST"
+
+
+def test_objective_without_matching_runtime_url_is_rejected(ctx):
+    record = new_run(ctx.runs_dir)
+    line = {
+        "analysis_id": "a-unrelated",
+        "locations": [{"url": "http://gateway-dast:8081/WebGoat/login"}],
+        "verification_objective": {
+            "description": "d",
+            "endpoint_hint": "POST /WebGoat/attack",
+            "payload_kind": "long_string",
+            "rationale": "r",
+        },
+    }
+    (record.root / "analysis.jsonl").write_text(
+        json.dumps(line) + "\n", encoding="utf-8"
+    )
+
+    record = step_propose(record, ctx)
+    payload = json.loads((record.root / "proposal.json").read_text(encoding="utf-8"))
+    assert payload["accepted"] is False
+    assert "runtime evidence" in payload["reason"]
 
 
 def test_step_analyze_invalid_summary_metrics_raises_step_failure(
@@ -385,6 +418,7 @@ def test_no_override_keeps_the_agent_choice(ctx):
     record = new_run(ctx.runs_dir)
     line = {
         "analysis_id": "a-post",
+        "locations": [{"url": "http://gateway-dast:8081/WebGoat/attack"}],
         "verification_objective": {
             "description": "d",
             "endpoint_hint": "POST /WebGoat/attack",
@@ -399,4 +433,3 @@ def test_no_override_keeps_the_agent_choice(ctx):
     payload = json.loads((record.root / "proposal.json").read_text(encoding="utf-8"))
     assert payload["operator_override"] is False
     assert payload["source_analysis_id"] == "a-post"
-
