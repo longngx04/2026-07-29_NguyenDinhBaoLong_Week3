@@ -2,7 +2,7 @@ SHELL := /usr/bin/env bash
 .SHELLFLAGS := -eu -o pipefail -c
 PYTHON := $(shell command -v .venv/bin/python3 2>/dev/null || command -v python3)
 
-.PHONY: up down target-up target-down scan scan-opengrep dast scan-zap normalize normalize-zap scan-all dast-test search kb-coverage kb-links analyze validate-analysis agent-test llm-test probe run runs clean-runs eval gateway-up gateway-reset gateway-down gateway-test gateway-live-test gateway-demo exercise-test guardrails-test guardrails-demo score-ground-truth lint typecheck coverage dep-audit quality refresh-recall-truth web
+.PHONY: up up-build down target-up target-down scan scan-opengrep dast scan-zap normalize normalize-zap scan-all dast-test search kb-coverage kb-links analyze validate-analysis agent-test llm-test probe run runs clean-runs eval gateway-up gateway-reset gateway-down gateway-test gateway-live-test gateway-demo exercise-test guardrails-test guardrails-demo score-ground-truth lint typecheck coverage dep-audit quality refresh-recall-truth web
 
 # Week 4 tests exercise the real Gateway and WebGoat.  The dependency starts
 # both services and waits for the allowlisted health endpoint before pytest.
@@ -249,6 +249,11 @@ guardrails-test:
 web:
 	@$(PYTHON) -m uvicorn project_sentinel.web.main:app --host 127.0.0.1 --port 8000 --reload
 
+# Khoi dong hang ngay dung image cache. Docker Compose tu build khi image chua ton tai;
+# dung `make up-build` khi da sua Dockerfile, dependency, hoac can ep build lai.
+up-build: COMPOSE_UP_BUILD_FLAG := --build
+up-build: up
+
 up:
 	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
 	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
@@ -256,7 +261,7 @@ up:
 	DAST_KEY=$${SENTINEL_DAST_API_KEY:-$$(openssl rand -hex 32)}; \
 	ZAP_KEY=$${SENTINEL_ZAP_API_KEY:-$$(openssl rand -hex 32)}; \
 	SENTINEL_GATEWAY_API_KEY="$$KEY" SENTINEL_DAST_API_KEY="$$DAST_KEY" SENTINEL_ZAP_API_KEY="$$ZAP_KEY" \
-	docker compose --profile target --profile app --profile dast up --build --detach; \
+	docker compose --profile target --profile app --profile dast up $(COMPOSE_UP_BUILD_FLAG) --detach; \
 	for attempt in $$(seq 1 30); do \
 		code=$$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:9080/WebGoat/actuator/health || true); \
 		if test "$$code" = 401; then break; fi; \
