@@ -100,6 +100,10 @@ This builds and starts five containers: WebGoat, the Gateway probe lane, the Gat
 lane, the ZAP daemon, and the web UI. Gateway credentials are generated fresh with
 `openssl rand -hex 32` on every `make up` — never written to Git, never printed.
 
+`make up` reuses Docker images already on the machine, so normal demo restarts do not rebuild
+unnecessarily. Docker Compose still builds a missing image on a fresh clone. After changing a
+Dockerfile or a dependency, use `make up-build` once to force a rebuild.
+
 - Web UI: <http://127.0.0.1:8000>
 - Gateway: <http://127.0.0.1:9080> — returns `401` without a key, which is correct
 
