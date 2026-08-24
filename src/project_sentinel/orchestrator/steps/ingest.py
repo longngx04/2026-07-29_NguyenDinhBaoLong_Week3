@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from pathlib import Path
 
 from project_sentinel.analysis.pipeline import run_pipeline
 from project_sentinel.config import AppConfig
@@ -171,9 +172,20 @@ def step_normalize(record: RunRecord, ctx: RunContext) -> RunRecord:
 
 
 
+def _analysis_input(root: Path) -> Path:
+    """Đường vào của analyze: danh sách đã lọc nếu có, không thì findings gốc.
+
+    Sự vắng mặt của `findings.verified.json` là tín hiệu suy giảm DUY NHẤT của
+    bước verify. `verify.jsonl` có thể tồn tại dở dang khi bước hỏng giữa chừng,
+    nên không được đọc nó để suy ra điều gì.
+    """
+    verified = root / "findings.verified.json"
+    return verified if verified.exists() else root / "findings.json"
+
+
 def step_analyze(record: RunRecord, ctx: RunContext) -> RunRecord:
-    """Bước 3 — agent đọc findings, tra kho tri thức, sinh báo cáo JSONL."""
-    source = record.root / "findings.json"
+    """Bước 4 — agent đọc findings, tra kho tri thức, sinh báo cáo JSONL."""
+    source = _analysis_input(record.root)
     if not source.exists():
         raise StepFailure(
             "Không có findings.json để phân tích; bước normalize chưa chạy"
