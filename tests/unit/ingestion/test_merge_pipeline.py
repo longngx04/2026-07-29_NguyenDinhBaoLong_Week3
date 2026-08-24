@@ -162,3 +162,39 @@ def test_file_sast_khong_co_mang_findings_thi_bao_loi(tmp_path):
             output=tmp_path / "out.json",
             project_root=tmp_path,
         )
+
+
+def test_main_tron_duoc_tu_dong_lenh(tmp_path):
+    sast = tmp_path / "sast-findings.json"
+    _write(sast, "opengrep", [SAST_FINDING])
+    output = tmp_path / "findings.json"
+
+    from project_sentinel.ingestion.merge_pipeline import main
+
+    code = main(
+        [
+            "--sast",
+            str(sast),
+            "--zap-alerts",
+            str(tmp_path / "khong-ton-tai.json"),
+            "--output",
+            str(output),
+            "--project-root",
+            str(tmp_path),
+        ]
+    )
+
+    assert code == 0
+    assert json.loads(output.read_text(encoding="utf-8"))["count"] == 1
+
+
+def test_main_tra_ma_loi_khi_thieu_file_sast(tmp_path, capsys):
+    from project_sentinel.ingestion.merge_pipeline import main
+
+    code = main(
+        ["--sast", str(tmp_path / "khong-co.json"), "--output", str(tmp_path / "o.json")]
+    )
+
+    assert code == 1
+    assert "error:" in capsys.readouterr().err
+

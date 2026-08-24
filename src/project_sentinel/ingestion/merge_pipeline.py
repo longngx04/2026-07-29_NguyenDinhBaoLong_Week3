@@ -11,10 +11,13 @@ thấy một finding DAST nào.
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
 
 from project_sentinel.analysis.correlation import correlate, parse_gateway_access_log
 from project_sentinel.ingestion.merge_findings import merge_files
@@ -104,3 +107,44 @@ def merge_normalized(
         "zap_findings": zap_added,
         "correlated": correlated,
     }
+
+
+DEFAULT_SAST = Path("artifacts/normalized/sast-findings.json")
+DEFAULT_ZAP_ALERTS = Path("artifacts/raw/zap.json")
+DEFAULT_GATEWAY_LOG = Path("artifacts/dast/gateway-access.log")
+DEFAULT_OUTPUT = Path("artifacts/normalized/findings.json")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Tron finding SAST va DAST thanh mot file chuan hoa duy nhat."
+    )
+    parser.add_argument("--sast", type=Path, default=DEFAULT_SAST)
+    parser.add_argument("--zap-alerts", type=Path, default=DEFAULT_ZAP_ALERTS)
+    parser.add_argument("--gateway-log", type=Path, default=DEFAULT_GATEWAY_LOG)
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--project-root", type=Path, default=Path.cwd())
+    args = parser.parse_args(argv)
+
+    try:
+        counts = merge_normalized(
+            sast_findings=args.sast,
+            zap_alerts=args.zap_alerts,
+            gateway_log=args.gateway_log,
+            output=args.output,
+            project_root=args.project_root,
+        )
+    except (FileNotFoundError, ValueError, OSError, json.JSONDecodeError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+
+    print(
+        f"Merged {counts['findings']} findings "
+        f"({counts['zap_findings']} from ZAP) -> {args.output}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
