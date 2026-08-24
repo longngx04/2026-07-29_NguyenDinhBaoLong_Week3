@@ -1,4 +1,4 @@
-"""Nối chín bước thành một luồng và lưu trạng thái sau mỗi bước.
+"""Nối mười bước thành một luồng và lưu trạng thái sau mỗi bước.
 
 Lỗi của một bước không thoát khỏi runner: lỗi được ghi vào ``state.json`` để
 CLI và tiến trình nền của web cùng nhìn thấy một kết quả bền trên đĩa.
@@ -37,6 +37,7 @@ from project_sentinel.orchestrator.steps import (
     step_report,
     step_scan,
     step_scrub,
+    step_verify,
 )
 
 StepFunction = Callable[[RunRecord, RunContext], RunRecord]
@@ -46,6 +47,7 @@ RUN_ID_PATTERN = re.compile(r"\A\d{8}T\d{6}(?:-\d+)?Z\Z")
 PHASE_ONE: Phase = (
     ("scan", step_scan),
     ("normalize", step_normalize),
+    ("verify", step_verify),
     ("analyze", step_analyze),
     ("propose", step_propose),
     ("approval", step_approval),
