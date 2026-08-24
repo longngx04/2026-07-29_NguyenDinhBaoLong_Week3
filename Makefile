@@ -7,8 +7,8 @@ PYTHON := $(shell command -v .venv/bin/python3 2>/dev/null || command -v python3
 # Week 4 tests exercise the real Gateway and WebGoat.  The dependency starts
 # both services and waits for the allowlisted health endpoint before pytest.
 agent-test: gateway-up
-	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
-	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null || true)}; \
+	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null || true)}; \
 	test -n "$$KEY" || (printf '%s\n' 'SENTINEL_GATEWAY_API_KEY is required in the environment or .env' >&2; exit 2); \
 	$(PYTHON) -m pytest -m "not llm and not live_gateway" -v tests; \
 	$(MAKE) gateway-reset; \
@@ -31,7 +31,7 @@ LLM_TEST_MAX_RETRIES ?= 0
 LLM_TEST_VALIDATION_MAX_RETRIES ?= 1
 
 llm-test:
-	@KEY=$${LLM_API_KEY:-$$(sed -n 's/^LLM_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${LLM_API_KEY:-$$(sed -n 's/^LLM_API_KEY=//p' .env 2>/dev/null || true)}; \
 	test -n "$$KEY" || (printf '%s\n' 'LLM_API_KEY is required in the environment or .env' >&2; exit 2); \
 	workers='$(LLM_TEST_WORKERS)'; \
 	if ! [[ "$$workers" =~ ^[1-9][0-9]*$$ ]]; then \
@@ -48,8 +48,8 @@ llm-test:
 		$(PYTHON) -m pytest -m llm -v "$${xdist_args[@]}"
 
 target-up:
-	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
-		KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null || true)}; \
+		KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null || true)}; \
 		test -n "$$KEY" || (printf '%s\n' 'SENTINEL_GATEWAY_API_KEY is required in the environment or .env' >&2; exit 2); \
 		SENTINEL_GATEWAY_API_KEY="$$KEY" docker compose --profile target up --detach gateway webgoat; \
 		for attempt in $$(seq 1 30); do \
@@ -65,8 +65,8 @@ target-up:
 	exit 1
 
 target-down:
-	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
-		KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null || true)}; \
+		KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null || true)}; \
 		SENTINEL_GATEWAY_API_KEY="$$KEY" docker compose --profile target down
 
 scan: scan-opengrep
@@ -123,17 +123,17 @@ validate-analysis:
 	@$(PYTHON) -m project_sentinel.cli validate --input artifacts/analysis/security-analysis.jsonl
 
 probe:
-	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
-	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null || true)}; \
+	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null || true)}; \
 	test -n "$$KEY" || (printf '%s\n' 'SENTINEL_GATEWAY_API_KEY is required in the environment or .env' >&2; exit 2); \
 	SENTINEL_GATEWAY_API_KEY="$$KEY" $(PYTHON) -m project_sentinel.cli probe --method GET --path /WebGoat/actuator/health
 
 run:
-	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
-	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null || true)}; \
+	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null || true)}; \
 	test -n "$$KEY" || (printf '%s\n' 'SENTINEL_GATEWAY_API_KEY is required in the environment or .env' >&2; exit 2); \
-	DAST_KEY=$${SENTINEL_DAST_API_KEY:-$$(sed -n 's/^SENTINEL_DAST_API_KEY=//p' .env 2>/dev/null)}; \
-	ZAP_KEY=$${SENTINEL_ZAP_API_KEY:-$$(sed -n 's/^SENTINEL_ZAP_API_KEY=//p' .env 2>/dev/null)}; \
+	DAST_KEY=$${SENTINEL_DAST_API_KEY:-$$(sed -n 's/^SENTINEL_DAST_API_KEY=//p' .env 2>/dev/null || true)}; \
+	ZAP_KEY=$${SENTINEL_ZAP_API_KEY:-$$(sed -n 's/^SENTINEL_ZAP_API_KEY=//p' .env 2>/dev/null || true)}; \
 	SENTINEL_GATEWAY_API_KEY="$$KEY" SENTINEL_DAST_API_KEY="$$DAST_KEY" SENTINEL_ZAP_API_KEY="$$ZAP_KEY" \
 	$(PYTHON) -m project_sentinel.cli run
 
@@ -144,7 +144,7 @@ EVAL_REPEAT ?= 3
 REPEAT ?= $(EVAL_REPEAT)
 
 eval:
-	@KEY=$${LLM_API_KEY:-$$(sed -n 's/^LLM_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${LLM_API_KEY:-$$(sed -n 's/^LLM_API_KEY=//p' .env 2>/dev/null || true)}; \
 	test -n "$$KEY" || (printf '%s\n' 'LLM_API_KEY is required in the environment or .env' >&2; exit 2); \
 	LLM_API_KEY="$$KEY" $(PYTHON) -m eval.run_eval --repeat $(REPEAT)
 
@@ -190,8 +190,8 @@ clean-runs:
 gateway-up: target-up
 
 gateway-reset:
-	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
-	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null || true)}; \
+	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null || true)}; \
 	test -n "$$KEY" || (printf '%s\n' 'SENTINEL_GATEWAY_API_KEY is required in the environment or .env' >&2; exit 2); \
 	SENTINEL_GATEWAY_API_KEY="$$KEY" docker compose --profile target restart gateway >/dev/null; \
 	for attempt in $$(seq 1 30); do \
@@ -202,16 +202,16 @@ gateway-reset:
 	done
 
 gateway-down:
-	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
-	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null || true)}; \
+	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null || true)}; \
 	SENTINEL_GATEWAY_API_KEY="$$KEY" docker compose --profile target down
 
 gateway-test: gateway-up
 	$(PYTHON) -m pytest -m "not llm" tests/unit/gateway tests/unit/probe -v
 
 gateway-live-test:
-	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
-	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null || true)}; \
+	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null || true)}; \
 	test -n "$$KEY" || (printf '%s\n' 'SENTINEL_GATEWAY_API_KEY is required in the environment or .env' >&2; exit 2); \
 	SENTINEL_GATEWAY_API_KEY="$$KEY" docker compose --profile target up --detach --build gateway webgoat; \
 	for attempt in $$(seq 1 30); do \
@@ -244,8 +244,8 @@ web:
 	@$(PYTHON) -m uvicorn project_sentinel.web.main:app --host 127.0.0.1 --port 8000 --reload
 
 up:
-	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null)}; \
-	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null)}; \
+	@KEY=$${SENTINEL_GATEWAY_API_KEY:-$$(sed -n 's/^SENTINEL_GATEWAY_API_KEY=//p' .env 2>/dev/null || true)}; \
+	KEY=$${KEY:-$$(sed -n 's/^SENTINEL_API_KEY=//p' .env 2>/dev/null || true)}; \
 	if [ -z "$$KEY" ]; then KEY="$$(openssl rand -hex 32)"; export SENTINEL_GATEWAY_API_KEY="$$KEY"; fi; \
 	DAST_KEY=$${SENTINEL_DAST_API_KEY:-$$(openssl rand -hex 32)}; \
 	ZAP_KEY=$${SENTINEL_ZAP_API_KEY:-$$(openssl rand -hex 32)}; \
