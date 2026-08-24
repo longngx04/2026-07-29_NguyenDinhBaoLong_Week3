@@ -135,11 +135,23 @@ def test_ghi_them_mot_dong_nhat_ky_lam_moi_dong_ho_im_lang(client):
 # --- Bảng điều khiển gom mọi thứ về một trang --------------------------------
 
 
-def test_bang_dieu_khien_hien_ca_chin_buoc_va_nhat_ky(client):
+def test_trang_chu_luon_la_man_hinh_khoi_dau_moi_tinh(client):
+    """Mở trang chủ `/` luôn là màn hình bắt đầu mới tinh, không tự dính vào lần chạy cũ."""
     http, ctx = client
     record = _run_stuck_at(ctx, "analyze", idle_seconds=1)
 
     body = http.get("/").text
+    assert "Trang bắt đầu" in body
+    assert "Bắt đầu phân tích mới" in body
+    # Vẫn hiển thị ID của lần chạy trong bảng lịch sử gần đây ở dưới
+    assert record.run_id in body
+
+
+def test_bang_dieu_khien_hien_ca_chin_buoc_va_nhat_ky(client):
+    http, ctx = client
+    record = _run_stuck_at(ctx, "analyze", idle_seconds=1)
+
+    body = http.get(f"/runs/{record.run_id}").text
     for name in ("scan", "normalize", "analyze", "propose", "approval",
                  "probe", "scrub", "report", "finalize"):
         assert f'data-step="{name}"' in body, f"Thiếu trạm {name} trên đường ray"
@@ -154,9 +166,9 @@ def test_bang_dieu_khien_danh_dau_san_trang_thai_treo_ngay_tu_may_chu(client):
     nhịp trước khi tự sửa, tức là nói dối một nhịp.
     """
     http, ctx = client
-    _run_stuck_at(ctx, "analyze", idle_seconds=400)
+    record = _run_stuck_at(ctx, "analyze", idle_seconds=400)
 
-    assert 'data-stalled="true"' in http.get("/").text
+    assert 'data-stalled="true"' in http.get(f"/runs/{record.run_id}").text
 
 
 def test_the_phe_duyet_nam_ngay_tren_bang_dieu_khien(client):
@@ -178,7 +190,7 @@ def test_the_phe_duyet_nam_ngay_tren_bang_dieu_khien(client):
     )
     save_run(record)
 
-    body = http.get("/").text
+    body = http.get(f"/runs/{record.run_id}").text
     assert "/WebGoat/attack" in body
     assert "Kiem tra gioi han do dai" in body
     assert f'action="/approvals/{record.run_id}"' in body

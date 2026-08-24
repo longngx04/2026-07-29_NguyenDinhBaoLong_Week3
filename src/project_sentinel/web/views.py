@@ -484,8 +484,6 @@ def console_data(ctx: RunContext, run_id: str | None = None) -> dict:
         target_record = _first_loadable_run(ctx, run_id)
     elif demo_run:
         target_record = _first_loadable_run(ctx, demo_run)
-    elif active_run:
-        target_record = active_run
 
     if target_record is None:
         return {

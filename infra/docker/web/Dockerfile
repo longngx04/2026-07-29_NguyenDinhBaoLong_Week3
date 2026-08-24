@@ -14,9 +14,15 @@ RUN apt-get update \
 
 WORKDIR /app
 
+# Install dependencies first so they are cached when source code changes
 COPY requirements.txt pyproject.toml ./
+RUN sed '/^-e /d' requirements.txt > /tmp/reqs.txt \
+    && python -m pip install --no-cache-dir -r /tmp/reqs.txt \
+    && rm /tmp/reqs.txt
+
+# Copy source code and install project in editable mode without re-downloading dependencies
 COPY src ./src
-RUN python -m pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --no-cache-dir --no-deps -e .
 
 COPY configs ./configs
 COPY schemas ./schemas
