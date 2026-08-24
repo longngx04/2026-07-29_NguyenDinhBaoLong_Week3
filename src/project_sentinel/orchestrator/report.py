@@ -143,6 +143,32 @@ def build_report(record: RunRecord) -> tuple[str, dict]:
         if isinstance(item.get("calibration"), dict):
             calibrated_records += 1
 
+    verify_summary = _read_json(root / "verify-summary.json", {})
+    verify_summary = verify_summary if isinstance(verify_summary, dict) else {}
+    verify_ran = bool(verify_summary)
+    verify_verdicts = _read_jsonl(root / "verify.jsonl") if verify_ran else []
+    verify_errors = _nonnegative_count(verify_summary.get("llm_errors"))
+    verify_degraded = verify_ran and verify_errors > 0
+    findings_dropped = _nonnegative_count(verify_summary.get("dropped"))
+    findings_verified = (
+        _nonnegative_count(verify_summary.get("kept")) if verify_ran else len(findings)
+    )
+
+    # Chi cac verdict thuc su dan toi viec loai bo. Mot verdict `uncertain` khong
+    # co gi de bao cao — finding cua no van di tiep binh thuong.
+    dropped_verdicts = [
+        item
+        for item in verify_verdicts
+        if isinstance(item, dict)
+        and item.get("verdict") == "false_positive"
+        and item.get("confidence") == "high"
+    ]
+    titles_by_id = {
+        str(f.get("id")): str(f.get("title") or "(không có tiêu đề)")
+        for f in findings
+        if isinstance(f, dict)
+    }
+
     probe_verdict = decide_verdict(
         proposal=proposal, probe=probe, analyses=analyses
     )
@@ -154,6 +180,9 @@ def build_report(record: RunRecord) -> tuple[str, dict]:
         "state": record.state.value,
         "created_at": record.created_at,
         "findings_total": len(findings),
+        "findings_verified": findings_verified,
+        "findings_dropped": findings_dropped,
+        "verify_degraded": verify_degraded,
         "analysis_groups": group_count,
         "analysis_records": len(analyses),
         "severities": severities,
@@ -185,6 +214,14 @@ def build_report(record: RunRecord) -> tuple[str, dict]:
         "",
         f"- Trạng thái: **{record.state.value}**",
         f"- Cảnh báo thô: **{len(findings)}**",
+        *(
+            [
+                f"- Sau bước verify: **{findings_verified}** đi vào phân tích, "
+                f"**{findings_dropped}** bị loại"
+            ]
+            if verify_ran
+            else []
+        ),
         f"- Nhóm sau phân tích: **{group_count}**"
         + (f" → **{len(analyses)}** record" if len(analyses) != group_count else ""),
         f"- Mức nghiêm trọng: {severities or 'không có'}",
@@ -224,6 +261,33 @@ def build_report(record: RunRecord) -> tuple[str, dict]:
             "> Lần chạy này dùng `--yes`: phê duyệt tự động, "
             "KHÔNG có người vận hành xác nhận."
         )
+    if verify_degraded:
+        lines.append(
+            "> **Bước verify bị suy giảm.** "
+            f"{verify_errors} cảnh báo không kết luận được và đã được GIỮ LẠI. "
+            "Con số bị loại dưới đây không phản ánh toàn bộ dữ liệu: "
+            + "; ".join(str(r) for r in verify_summary.get("degraded_reasons", [])[:5])
+        )
+
+    if dropped_verdicts:
+        lines += [
+            "",
+            "## Đã loại ở bước verify",
+            "",
+            "Những cảnh báo dưới đây KHÔNG được phân tích vì bước verify kết luận "
+            "chúng là báo nhầm. Chúng vẫn nằm nguyên trong `findings.json` và "
+            "`verify.jsonl` để phúc tra.",
+            "",
+            "| Finding | Tiêu đề | Lý do |",
+            "| :--- | :--- | :--- |",
+        ]
+        for item in dropped_verdicts:
+            finding_id = str(item.get("finding_id"))
+            lines.append(
+                f"| `{finding_id}` | {titles_by_id.get(finding_id, '(không rõ)')} "
+                f"| {item.get('rationale', '')} |"
+            )
+
     lines += [
         f"- Lời gọi LLM: {llm_calls} "
         f"({invalid_outputs} phản hồi không hợp lệ)",
